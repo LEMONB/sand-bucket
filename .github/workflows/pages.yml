@@ -2,7 +2,7 @@ name: Check and deploy
 
 on:
   push:
-    branches: [main, feat/playable-prototype]
+    branches: [main, 'feat/**']
   pull_request:
     branches: [main]
   workflow_dispatch:

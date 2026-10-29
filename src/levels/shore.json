@@ -1,0 +1,152 @@
+{
+  "seed": 20261029,
+  "field": [
+    {
+      "id": 5,
+      "color": 2,
+      "capacity": 486
+    },
+    {
+      "id": 8,
+      "color": 2,
+      "capacity": 517
+    },
+    {
+      "id": 1,
+      "color": 1,
+      "capacity": 650
+    },
+    {
+      "id": 0,
+      "color": 1,
+      "capacity": 817
+    },
+    {
+      "id": 6,
+      "color": 2,
+      "capacity": 453
+    },
+    {
+      "id": 9,
+      "color": 3,
+      "capacity": 313
+    },
+    {
+      "id": 12,
+      "color": 4,
+      "capacity": 1673
+    },
+    {
+      "id": 4,
+      "color": 2,
+      "capacity": 643
+    },
+    {
+      "id": 14,
+      "color": 4,
+      "capacity": 2006
+    },
+    {
+      "id": 13,
+      "color": 4,
+      "capacity": 2244
+    },
+    {
+      "id": 7,
+      "color": 2,
+      "capacity": 506
+    },
+    {
+      "id": 2,
+      "color": 1,
+      "capacity": 761
+    },
+    {
+      "id": 11,
+      "color": 3,
+      "capacity": 321
+    },
+    {
+      "id": 10,
+      "color": 3,
+      "capacity": 371
+    },
+    {
+      "id": 15,
+      "color": 4,
+      "capacity": 1660
+    },
+    {
+      "id": 3,
+      "color": 1,
+      "capacity": 915
+    }
+  ],
+  "solution": [
+    {
+      "tick": 0,
+      "bucketId": 0
+    },
+    {
+      "tick": 26,
+      "bucketId": 4
+    },
+    {
+      "tick": 69,
+      "bucketId": 1
+    },
+    {
+      "tick": 137,
+      "bucketId": 2
+    },
+    {
+      "tick": 220,
+      "bucketId": 3
+    },
+    {
+      "tick": 297,
+      "bucketId": 12
+    },
+    {
+      "tick": 321,
+      "bucketId": 9
+    },
+    {
+      "tick": 379,
+      "bucketId": 5
+    },
+    {
+      "tick": 429,
+      "bucketId": 6
+    },
+    {
+      "tick": 537,
+      "bucketId": 7
+    },
+    {
+      "tick": 701,
+      "bucketId": 8
+    },
+    {
+      "tick": 737,
+      "bucketId": 13
+    },
+    {
+      "tick": 975,
+      "bucketId": 14
+    },
+    {
+      "tick": 1084,
+      "bucketId": 10
+    },
+    {
+      "tick": 1110,
+      "bucketId": 15
+    },
+    {
+      "tick": 1449,
+      "bucketId": 11
+    }
+  ],
+  "victoryTick": 1973
+}
