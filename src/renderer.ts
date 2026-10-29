@@ -7,7 +7,10 @@ export class SandPainter {
   private readonly shades = new Uint8ClampedArray(WIDTH * HEIGHT * 4 * 3);
   constructor(private context: CanvasRenderingContext2D) {
     this.image = context.createImageData(WIDTH, HEIGHT);
-    const colors = PALETTE.map(color => parseInt(color.slice(1), 16));
+    this.setPalette(PALETTE);
+  }
+  setPalette(palette: string[]): void {
+    const colors = palette.map(color => parseInt(color.slice(1), 16));
     for (let i = 0; i < WIDTH * HEIGHT; i++) {
       const noise = Math.imul(i ^ (i >>> 7), 0x45d9f3b);
       const shade = ((noise ^ (noise >>> 16)) >>> 0) % 17 - 8;
@@ -29,7 +32,7 @@ export class SandPainter {
     this.context.putImageData(this.image, 0, 0);
   }
 }
-export function paintSand(context: CanvasRenderingContext2D, cells: Uint8Array): void { new SandPainter(context).draw(cells); }
+export function paintSand(context: CanvasRenderingContext2D, cells: Uint8Array, palette = PALETTE): void { const painter=new SandPainter(context);painter.setPalette(palette);painter.draw(cells); }
 export class GameRenderer {
   readonly app = new Application();
   private readonly canvas = document.createElement('canvas');
@@ -50,6 +53,7 @@ export class GameRenderer {
   reset(): void { this.revision = -1; }
   draw(game: Game): void {
     if (game.revision === this.revision) return;
+    if(this.revision<0)this.painter.setPalette(game.palette);
     this.painter.draw(game.cells); this.texture.source.update(); this.revision = game.revision;
   }
 }

@@ -1,0 +1,66 @@
+import { expect,it } from 'vitest';
+import { Game, WIDTH, HEIGHT, type BucketSpec, type Level } from '../src/game';
+import { emptyMechanics } from '../src/mechanics';
+
+const bucket=(id:number,color=1,capacity=20):BucketSpec=>({id,color,capacity});
+function fixture(entries:Record<number,BucketSpec>, change:(level:Level)=>void=()=>{}):Level {
+  const field=Array<BucketSpec|null>(16).fill(null);
+  Object.entries(entries).forEach(([i,b])=>{field[Number(i)]=b;});
+  const level:Level={field,cells:new Uint8Array(WIDTH*HEIGHT),mechanics:emptyMechanics()};
+  change(level);
+  let cursor=level.cells.length-1;
+  for(const b of [...field,...level.mechanics!.queues.flatMap(q=>q.buckets),...level.mechanics!.platforms.flatMap(p=>p.next)])if(b)for(let i=0;i<b.capacity;i++)level.cells[cursor--]=b.color;
+  return level;
+}
+function advance(game:Game,ticks=28):void {for(let i=0;i<ticks;i++)game.step();}
+
+it('queues reveal one bucket after departure and do not exceed five',()=>{
+  const level=fixture({0:bucket(0)},l=>{l.mechanics!.queues=[{cell:0,buckets:[bucket(1),bucket(2),bucket(3),bucket(4)]}];});
+  const game=new Game(level);expect(game.launch(0)).toBe('ok');expect(game.field[0]).toBeNull();
+  advance(game);expect(game.field[0]?.id).toBe(1);expect(game.mechanics.queues[0].buckets).toHaveLength(3);
+  level.mechanics!.queues[0].buckets.push(bucket(5));expect(()=>new Game(level)).toThrow();
+});
+it('rotates the tray clockwise once per successful turn, including empty positions',()=>{
+  const game=new Game(fixture({0:bucket(0),1:bucket(1),4:bucket(2),5:bucket(3),2:bucket(4)},l=>{l.mechanics!.trays=[[0,1,5,4]];}));
+  expect(game.launch(4)).toBe('ok');expect(game.launch(3)).toBe('blocked');advance(game);
+  expect([0,1,5,4].map(i=>game.field[i]?.id)).toEqual([2,0,1,3]);expect(game.turns).toBe(1);
+  expect(game.launch(2)).toBe('ok');advance(game);expect(game.field[1]).toBeNull();
+});
+it('reveals the next platform layer only after all upper buckets leave',()=>{
+  const game=new Game(fixture({0:bucket(0),1:bucket(1)},l=>{l.mechanics!.platforms=[{cells:[0,1],next:[bucket(2),bucket(3)]}];}));
+  game.launch(0);advance(game);expect(game.field[0]).toBeNull();
+  game.launch(1);advance(game);expect(game.field.slice(0,2).map(b=>b?.id)).toEqual([2,3]);
+  expect(game.mechanics.platforms[0].next).toHaveLength(0);
+});
+it('removes the whole bridge when its last bucket departs',()=>{
+  const game=new Game(fixture({0:bucket(0),1:bucket(1),8:bucket(2)},l=>{l.mechanics!.bridges=[{cells:[0,1],passage:[4,5]}];}));
+  game.launch(0);advance(game);expect(game.mechanics.bridges).toHaveLength(1);
+  game.launch(1);advance(game);expect(game.mechanics.bridges).toHaveLength(0);expect(game.paths.has(8)).toBe(true);
+});
+it('sends a linked pair as one turn, or the clicked bucket alone when one slot remains',()=>{
+  const level=fixture({0:bucket(0),1:bucket(1)},l=>{l.mechanics!.links=[[0,1]];});
+  const pair=new Game(level);pair.launch(1);expect(pair.slots.filter(Boolean).map(b=>b!.id)).toEqual([1,0]);expect(pair.turns).toBe(1);
+  const single=new Game(level);
+  for(let i=0;i<4;i++)single.slots[i]={...bucket(10+i),filled:0,arrivalTick:18};
+  expect(single.launch(1)).toBe('ok');expect(single.field[0]?.id).toBe(0);expect(single.mechanics.links).toHaveLength(0);
+  expect(single.launch(0)).toBe('full');expect(single.turns).toBe(1);
+});
+it('keeps the chosen color on the belt and alternates only remaining buckets',()=>{
+  const game=new Game(fixture({0:{...bucket(0),alternate:2},1:bucket(1)}));
+  game.launch(1);advance(game);expect(game.field[0]?.color).toBe(2);
+  game.launch(0);advance(game);expect(game.buckets.find(b=>b.id===0)?.color).toBe(2);
+});
+it('holds covered grains until the matching key bucket fills, also opening its gate',()=>{
+  const level=fixture({0:bucket(0,1,1),1:bucket(1,2,1)},l=>{
+    l.mechanics!.lids=[{x:5,y:5,width:1,height:1,key:0}];l.mechanics!.gates=[{cells:[4],key:0}];
+  });
+  level.cells.fill(0);level.cells[5*WIDTH+5]=2;level.cells[(HEIGHT-1)*WIDTH+6]=1;
+  const game=new Game(level);advance(game,10);expect(game.cells[5*WIDTH+5]).toBe(2);
+  game.launch(0);for(let i=0;i<400&&game.mechanics.lids.length;i++)game.step();
+  expect(game.mechanics.lids).toHaveLength(0);expect(game.mechanics.gates).toHaveLength(0);expect(game.held[5*WIDTH+5]).toBe(0);
+});
+it('rejects intersecting regions, missing keys and duplicate bucket IDs',()=>{
+  const level=fixture({0:bucket(0),1:bucket(1),4:bucket(2),5:bucket(3)},l=>{l.mechanics!.trays=[[0,1,5,4]];l.mechanics!.queues=[{cell:0,buckets:[bucket(4)]}];});
+  expect(()=>new Game(level)).toThrow();
+  const missing=fixture({0:bucket(0)},l=>{l.mechanics!.gates=[{cells:[4],key:99}];});expect(()=>new Game(missing)).toThrow();
+});

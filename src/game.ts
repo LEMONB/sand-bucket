@@ -12,6 +12,7 @@ export interface BucketSpec {
   id: number;
   color: number;
   capacity: number;
+  alternate?: number;
 }
 
 export interface Level {
@@ -19,6 +20,8 @@ export interface Level {
   field: (BucketSpec | null)[];
   columns?: number;
   walls?: number[];
+  mechanics?: Mechanics;
+  palette?: string[];
 }
 
 export interface Bucket extends BucketSpec {
@@ -70,7 +73,14 @@ export function accessibleCells(field: readonly (BucketSpec | null)[], columns =
 
 export class Game {
   readonly columns: number;
-  readonly walls: ReadonlySet<number>;
+  readonly walls: Set<number>;
+  readonly mechanics: Mechanics;
+  readonly palette: string[];
+  readonly held = new Uint8Array(WIDTH * HEIGHT);
+  fieldRevision = 0;
+  turns = 0;
+  busyUntil = 0;
+  private pendingField = false;
   readonly events: GameEvent[] = [];
   paths: Map<number, number[]>;
   private settled = false;
@@ -87,6 +97,9 @@ export class Game {
   constructor(level: Level) {
     this.columns = level.columns ?? FIELD_COLUMNS;
     this.walls = new Set(level.walls ?? []);
+    this.mechanics = structuredClone(level.mechanics ?? emptyMechanics());
+    this.palette = level.palette ? [...level.palette] : [...PALETTE];
+    if (this.palette.length !== 5 || this.palette.some(c => !/^#[0-9a-f]{6}$/i.test(c))) throw new Error('Неверная палитра');
     if (!Number.isInteger(this.columns) || this.columns < 4 || this.columns > 7 ||
         level.cells.length !== WIDTH * HEIGHT || level.field.length !== this.columns ** 2) {
       throw new Error('Неверный размер уровня');
@@ -103,24 +116,100 @@ export class Game {
       }
       sand[color]++;
     }
-    for (const bucket of level.field) {
+    const allBuckets = [...level.field, ...this.mechanics.queues.flatMap(q => q.buckets), ...this.mechanics.platforms.flatMap(p => p.next)];
+    for (const bucket of allBuckets) {
       if (!bucket) continue;
       if (!Number.isInteger(bucket.id) || bucket.id < 0 || ids.has(bucket.id) ||
           !Number.isInteger(bucket.color) || bucket.color < 1 || bucket.color >= PALETTE.length ||
-          !Number.isInteger(bucket.capacity) || bucket.capacity <= 0) {
+          !Number.isInteger(bucket.capacity) || bucket.capacity <= 0 ||
+          (bucket.alternate !== undefined && (!Number.isInteger(bucket.alternate) || bucket.alternate < 1 || bucket.alternate > 4 || bucket.alternate === bucket.color))) {
         throw new Error('Неверные параметры ведра');
       }
       ids.add(bucket.id);
       space[bucket.color] += bucket.capacity;
     }
-    if (sand.slice(1).some((count, i) => count !== space[i + 1])) {
+    const flexible = allBuckets.some(b => b?.alternate !== undefined);
+    if (sand.slice(1).reduce((a,b)=>a+b,0) !== space.slice(1).reduce((a,b)=>a+b,0) ||
+        (!flexible && sand.slice(1).some((count, i) => count !== space[i + 1]))) {
       throw new Error('Количество песка не совпадает с вместимостью вёдер');
     }
     this.cells = level.cells.slice();
     this.field = level.field.map((bucket) => bucket ? { ...bucket } : null);
-    this.paths = exitPaths(this.field, this.columns, this.walls);
+    this.validateMechanics(ids);
+    this.paths = new Map();
+    this.refreshField();
     this.total = sand.slice(1).reduce((a, b) => a + b, 0);
     if (!this.total) this.status = 'won';
+  }
+
+  private validateMechanics(ids: Set<number>): void {
+    const used = new Set<number>();
+    const region = (cells: number[]) => {
+      if (!cells.length || new Set(cells).size!==cells.length || cells.some(i => !Number.isInteger(i) || i < 0 || i >= this.field.length || used.has(i) || this.walls.has(i))) throw new Error('Пересекающиеся или неверные области');
+      cells.forEach(i => used.add(i));
+    };
+    for (const q of this.mechanics.queues) {
+      region([q.cell]);
+      if (!this.field[q.cell] || q.buckets.length < 1 || q.buckets.length > 4) throw new Error('Неверная очередь');
+    }
+    for (const p of this.mechanics.platforms) {
+      region(p.cells);
+      if (p.cells.length !== p.next.length || p.cells.some(i => !this.field[i])) throw new Error('Неверная платформа');
+    }
+    for (const t of this.mechanics.trays) {
+      region(t);
+      const [a,b,c,d] = t;
+      if (t.length !== 4 || a % this.columns === this.columns-1 || b !== a+1 || c !== b+this.columns || d !== a+this.columns || t.some(i => this.walls.has(i) || this.field[i]?.alternate)) throw new Error('Неверный поднос');
+    }
+    for (const b of this.mechanics.bridges) { region(b.cells); region(b.passage); if (b.passage.some(i=>this.field[i]) || b.cells.some(i=>!this.field[i])) throw new Error('Неверный мост'); }
+    for (const g of this.mechanics.gates) { region(g.cells); if (!ids.has(g.key) || g.cells.some(i=>this.field[i])) throw new Error('Неверный замок'); }
+    const linked = new Set<number>();
+    for (const pair of this.mechanics.links) {
+      if (pair.length !== 2 || pair.some(id => !ids.has(id) || linked.has(id))) throw new Error('Неверная пара');
+      pair.forEach(id => linked.add(id));
+      if (new Set(pair).size !== 2 || pair.some(id=>!this.field.some((b,i)=>b?.id===id&&!used.has(i)))) throw new Error('Пара пересекает область');
+    }
+    for (const lid of this.mechanics.lids) {
+      if (!ids.has(lid.key) || [lid.x,lid.y,lid.width,lid.height].some(v=>!Number.isInteger(v)) || lid.x<0 || lid.y<0 || lid.width<1 || lid.height<1 || lid.x+lid.width>WIDTH || lid.y+lid.height>HEIGHT) throw new Error('Неверная крышка');
+      for(let y=lid.y;y<lid.y+lid.height;y++) for(let x=lid.x;x<lid.x+lid.width;x++) {
+        const i=y*WIDTH+x;
+        if(this.held[i]) throw new Error('Пересекающиеся крышки');
+        this.held[i]=1;
+      }
+    }
+  }
+
+  refreshField(): void {
+    const walls = new Set(this.walls);
+    this.mechanics.gates.forEach(g=>g.cells.forEach(i=>walls.add(i)));
+    this.mechanics.bridges.forEach(b=>b.passage.forEach(i=>walls.add(i)));
+    this.paths = exitPaths(this.field, this.columns, walls);
+    this.fieldRevision++;
+  }
+
+  private finishFieldMove(): void {
+    for (const q of this.mechanics.queues) if (!this.field[q.cell] && q.buckets.length) this.field[q.cell] = q.buckets.shift()!;
+    for (const p of this.mechanics.platforms) if (p.next.length && p.cells.every(i=>!this.field[i])) {
+      p.cells.forEach((i,j)=>{this.field[i]=p.next[j];}); p.next=[];
+    }
+    this.mechanics.bridges = this.mechanics.bridges.filter(b=>!b.cells.every(i=>!this.field[i]));
+    for (const cells of this.mechanics.trays) {
+      const buckets=cells.map(i=>this.field[i]);
+      cells.forEach((i,j)=>{this.field[i]=buckets[(j+3)%4];});
+    }
+    for(const bucket of this.field) if(bucket?.alternate) [bucket.color,bucket.alternate]=[bucket.alternate,bucket.color];
+    this.pendingField=false; this.refreshField();
+  }
+
+  private unlock(id: number): void {
+    const before=this.mechanics.gates.length+this.mechanics.lids.length;
+    this.mechanics.gates=this.mechanics.gates.filter(g=>g.key!==id);
+    this.mechanics.lids=this.mechanics.lids.filter(l=>{
+      if(l.key!==id)return true;
+      for(let y=l.y;y<l.y+l.height;y++)this.held.fill(0,y*WIDTH+l.x,y*WIDTH+l.x+l.width);
+      this.settled=false; return false;
+    });
+    if(before!==this.mechanics.gates.length+this.mechanics.lids.length)this.refreshField();
   }
 
   get buckets(): Bucket[] {
@@ -134,15 +223,29 @@ export class Game {
 
   launch(bucketId: number): LaunchResult {
     if (this.status !== 'playing') return 'finished';
+    if (this.tick < this.busyUntil) return 'blocked';
     const index = this.field.findIndex((bucket) => bucket?.id === bucketId);
     if (index < 0) return 'empty';
     if (!this.paths.has(index)) return 'blocked';
     const slot = this.slots.indexOf(null);
     if (slot < 0) return 'full';
-    this.slots[slot] = { ...this.field[index]!, filled: 0, arrivalTick: this.tick + LAUNCH_TICKS };
-    this.events.push({ type: 'launch', tick: this.tick, slot, bucket: { ...this.slots[slot] }, path: this.paths.get(index)! });
-    this.field[index] = null;
-    this.paths = exitPaths(this.field, this.columns, this.walls);
+    const pair=this.mechanics.links.find(p=>p.includes(bucketId));
+    const partner=pair?.find(id=>id!==bucketId);
+    const partnerIndex=this.field.findIndex(b=>b?.id===partner);
+    const indexes=[index];
+    if(pair&&this.slots.filter(b=>!b).length>=2&&(partnerIndex<0||!this.paths.has(partnerIndex)))return 'blocked';
+    if(partnerIndex>=0&&this.paths.has(partnerIndex)&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
+    if(pair)this.mechanics.links=this.mechanics.links.filter(p=>p!==pair);
+    for(const position of indexes) {
+      const free=this.slots.indexOf(null);
+      this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.tick+LAUNCH_TICKS};
+      this.events.push({type:'launch',tick:this.tick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!});
+      this.field[position]=null;
+    }
+    this.turns++;
+    const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.bridges.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.alternate));
+    if(changes) { this.pendingField=true; this.busyUntil=this.tick+LAUNCH_TICKS+10; }
+    this.refreshField();
     this.quietTicks = 0;
     return 'ok';
   }
@@ -150,6 +253,7 @@ export class Game {
   step(): void {
     if (this.status !== 'playing') return;
     this.tick++;
+    if(this.pendingField && this.tick>=this.busyUntil-10)this.finishFieldMove();
     let changed = false;
     for (let slot = 0; slot < BELT_LIMIT; slot++) {
       const bucket = this.slots[slot];
@@ -161,7 +265,7 @@ export class Game {
       for (let y = HEIGHT - 1; y >= HEIGHT - COLLECTION_DEPTH && bucket.filled < bucket.capacity; y--) {
         for (let x = Math.max(0, center - 7); x <= Math.min(WIDTH - 1, center + 7) && bucket.filled < bucket.capacity; x++) {
           const index = y * WIDTH + x;
-          if (this.cells[index] === bucket.color) {
+          if (!this.held[index] && this.cells[index] === bucket.color) {
             sourceX += x; sourceY += y;
             this.cells[index] = 0;
             bucket.filled++;
@@ -175,6 +279,7 @@ export class Game {
       if (bucket.filled === bucket.capacity) {
         this.events.push({ type: 'complete', tick: this.tick, slot, bucket: { ...bucket } });
         this.slots[slot] = null;
+        this.unlock(bucket.id);
       }
     }
 
@@ -186,13 +291,13 @@ export class Game {
         for (let i = 0; i < WIDTH; i++) {
           const x = this.tick % 2 ? i : WIDTH - 1 - i;
           const index = y * WIDTH + x;
-          if (this.cells[index] === 0) continue;
+          if (this.cells[index] === 0 || this.held[index]) continue;
           let target = index + WIDTH;
-          if (this.cells[target] !== 0) {
+          if (this.cells[target] !== 0 || this.held[target]) {
             const direction = (x + this.tick) % 2 ? 1 : -1;
-            if (x + direction >= 0 && x + direction < WIDTH && this.cells[target + direction] === 0) {
+            if (x + direction >= 0 && x + direction < WIDTH && this.cells[target + direction] === 0 && !this.held[target+direction]) {
               target += direction;
-            } else if (x - direction >= 0 && x - direction < WIDTH && this.cells[target - direction] === 0) {
+            } else if (x - direction >= 0 && x - direction < WIDTH && this.cells[target - direction] === 0 && !this.held[target-direction]) {
               target -= direction;
             } else {
               continue;
@@ -215,7 +320,7 @@ export class Game {
     if (this.collected === this.total) {
       this.status = 'won';
     } else if (this.quietTicks >= LOOP_TICKS &&
-        (this.slots.every(Boolean) || this.paths.size === 0) && !this.slots.some(b => b && b.arrivalTick > this.tick)) {
+        (this.slots.every(Boolean) || this.paths.size === 0) && !this.pendingField && !this.slots.some(b => b && b.arrivalTick > this.tick)) {
       this.status = 'lost';
     }
   }
@@ -230,3 +335,4 @@ export function advanceFrame(game: Game, seconds: number, speed: Speed, remainde
   }
   return Math.max(0, remainder);
 }
+import { emptyMechanics, type Mechanics } from './mechanics.ts';
