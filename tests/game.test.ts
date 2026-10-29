@@ -1,201 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import {
-  BELT_LIMIT, COLLECTION_DEPTH, FIELD_SIZE, Game, HEIGHT, LOOP_TICKS, WIDTH,
-  accessibleCells, advanceFrame, type BucketSpec, type Level,
-} from '../src/game';
+import { Game, WIDTH, HEIGHT, LAUNCH_TICKS, LOOP_TICKS, accessibleCells, exitPaths, advanceFrame, type BucketSpec, type Level } from '../src/game';
 import { createLevel } from '../src/level';
-import shore from '../src/levels/shore.json';
-import { replay } from '../scripts/generator';
-
-function run(game: Game, ticks: number): void {
-  for (let i = 0; i < ticks; i++) game.step();
-}
-function board(): BucketSpec[] {
-  return Array.from({ length: FIELD_SIZE }, (_, id) => ({ id, color: 1, capacity: 1 }));
-}
-function fixture(cells: Uint8Array, buckets: BucketSpec[]): Level {
-  return { cells, field: Array.from({ length: FIELD_SIZE }, (_, i) => buckets[i] ?? null) };
-}
-function deadlock(): Game {
+const run = (g: Game, ticks: number) => { for (let i = 0; i < ticks; i++) g.step(); };
+const board = (size = 4): BucketSpec[] => Array.from({length: size ** 2}, (_, id) => ({id, color:1, capacity:1}));
+function fixture(colors: number[], buckets: BucketSpec[]): Level {
   const cells = new Uint8Array(WIDTH * HEIGHT);
-  cells.fill(1, (HEIGHT - COLLECTION_DEPTH) * WIDTH);
-  cells.fill(2, (HEIGHT - COLLECTION_DEPTH - 1) * WIDTH, (HEIGHT - COLLECTION_DEPTH) * WIDTH);
-  const buckets = Array.from({ length: 5 }, (_, id) => ({ id, color: 2, capacity: 25 + Number(id < 3) }));
-  buckets.push({ id: 5, color: 1, capacity: WIDTH * COLLECTION_DEPTH });
-  const game = new Game(fixture(cells, buckets));
-  for (let id = 0; id < 5; id++) expect(game.launch(id)).toBe('ok');
-  return game;
+  colors.forEach((c, i) => { cells[(HEIGHT - 1) * WIDTH + i + 4] = c; });
+  return {cells, field:Array.from({length:16}, (_,i) => buckets[i] ?? null)};
 }
-
-describe('paths through the bucket field', () => {
-  it('initially exposes only the four top cells', () => {
-    expect([...accessibleCells(board())].sort()).toEqual([0, 1, 2, 3]);
+describe('routes and walls', () => {
+  it('finds winding paths but never crosses buckets, walls or diagonals', () => {
+    const field: (BucketSpec|null)[] = board();
+    for (const i of [0,4,8,9,10,6]) field[i] = null;
+    expect(exitPaths(field).get(7)).toEqual([7,6,10,9,8,4,0]);
+    expect(accessibleCells(field).has(15)).toBe(false);
+    expect(accessibleCells(field,4,new Set([8])).has(7)).toBe(false);
+    const diagonal: (BucketSpec|null)[] = board(); diagonal[0]=null; diagonal[5]=null;
+    expect(accessibleCells(diagonal).has(9)).toBe(false);
   });
-  it('finds winding paths including a downward segment, without passing through buckets', () => {
-    const field: (BucketSpec | null)[] = board();
-    for (const index of [0, 4, 8, 9, 10, 6]) field[index] = null;
-    const available = accessibleCells(field);
-    expect(available.has(7)).toBe(true); // 0 → 4 → 8 → 9 → 10 → 6 → 7
-    expect(available.has(15)).toBe(false);
-    expect(available.has(5)).toBe(true);
-  });
-  it('does not use diagonal gaps or disconnected empty pockets', () => {
-    const field: (BucketSpec | null)[] = board();
-    field[0] = null;
-    field[5] = null;
-    expect(accessibleCells(field).has(9)).toBe(false);
-    field[4] = null;
-    expect(accessibleCells(field).has(9)).toBe(true);
-  });
-  it('launches by ID, opens paths and leaves remaining buckets in place', () => {
-    const game = new Game(createLevel());
-    const buried = game.field[7]!;
-    const front = game.field[3]!;
-    expect(game.launch(buried.id)).toBe('blocked');
-    expect(game.launch(front.id)).toBe('ok');
-    expect(game.field[3]).toBeNull();
-    expect(game.field[7]?.id).toBe(buried.id);
-    expect(game.launch(buried.id)).toBe('ok');
-    expect(game.launch(front.id)).toBe('empty');
-    expect(game.launch(-1)).toBe('empty');
+  for (const size of [4,5,6,7]) it(`supports ${size} columns without row wrapping`, () => {
+    expect([...accessibleCells(board(size),size)]).toEqual(Array.from({length:size},(_,i)=>i));
   });
 });
-
-describe('slots and collection', () => {
-  it('has five evenly spaced slots and preserves buckets over a wrap', () => {
-    const game = new Game(createLevel());
-    const id = game.field[0]!.id; // Coral is initially above the collection zone.
-    expect(game.launch(id)).toBe('ok');
-    const bucket = game.slots[0];
-    const positions = game.slots.map((_, i) => game.slotPosition(i));
-    run(game, LOOP_TICKS);
-    expect(game.slots).toHaveLength(BELT_LIMIT);
-    expect(game.slots[0]).toBe(bucket);
-    expect(game.collected).toBe(0);
-    expect(game.slots.map((_, i) => game.slotPosition(i))).toEqual(positions);
-    for (let i = 1; i < positions.length; i++) expect(positions[i] - positions[i - 1]).toBeCloseTo(0.2);
+describe('simulation', () => {
+  it('reserves the first slot immediately, opens a route and only collects after arrival', () => {
+    const level=fixture([1], [{id:0,color:1,capacity:1}]); const g=new Game(level);
+    expect(g.launch(0)).toBe('ok'); expect(g.slots[0]?.id).toBe(0); expect(g.field[0]).toBeNull();
+    expect(g.events[0].path).toEqual([0]); run(g,LAUNCH_TICKS-1); expect(g.collected).toBe(0);
+    g.step(); expect(g.collected).toBe(1); expect(g.status).toBe('won'); expect(g.slots[0]).toBeNull();
+    expect(g.events.map(e=>e.type)).toEqual(['launch','arrive','collect','complete']);
+    expect(g.events[2].amount).toBe(1);
+    expect(g.events[2].from).toEqual({x:4.5/WIDTH,y:(HEIGHT-.5)/HEIGHT});
+    expect(level.field[0]?.id).toBe(0);
   });
-  it('launches into the first free slot without waiting for the entrance', () => {
-    const game = new Game(createLevel());
-    const ids = game.field.slice(0, 4).map((b) => b!.id);
-    ids.forEach((id) => expect(game.launch(id)).toBe('ok'));
-    expect(game.slots.slice(0, 4).map((b) => b!.id)).toEqual(ids);
+  it('collects five rows through other colors, excludes sixth row and respects capacity', () => {
+    const cells=new Uint8Array(WIDTH*HEIGHT); cells.fill(2);
+    cells[(HEIGHT-5)*WIDTH+6]=1; cells[(HEIGHT-6)*WIDTH+6]=1;
+    const field=Array<BucketSpec|null>(16).fill(null); field[0]={id:0,color:1,capacity:2};field[1]={id:1,color:2,capacity:cells.length-2};
+    const g=new Game({cells,field});g.launch(0);run(g,LAUNCH_TICKS);
+    expect(g.collected).toBe(1);expect(g.slots[0]?.filled).toBe(1);
+    expect(g.cells.filter(c=>c===2)).toHaveLength(cells.length-2);
   });
-  it('collects from the fifth row through foreign sand, but not the sixth', () => {
-    const cells = new Uint8Array(WIDTH * HEIGHT);
-    for (let y = HEIGHT - 4; y < HEIGHT; y++) cells[y * WIDTH] = 2;
-    cells[(HEIGHT - 5) * WIDTH] = 1;
-    cells[(HEIGHT - 6) * WIDTH] = 1;
-    const game = new Game(fixture(cells, [{ id: 0, color: 1, capacity: 2 }, { id: 1, color: 2, capacity: 4 }]));
-    game.launch(0);
-    game.step();
-    expect(game.collected).toBe(1);
-    expect(game.slots[0]?.filled).toBe(1);
-    expect([...game.cells].filter((color) => color === 2)).toHaveLength(4);
-    expect([...game.cells].filter((color) => color === 1)).toHaveLength(1);
+  it('keeps five slots evenly spaced across wrapping', () => {
+    const g=new Game(createLevel()); const before=g.slots.map((_,i)=>g.slotPosition(i));run(g,LOOP_TICKS);
+    expect(g.slots.map((_,i)=>g.slotPosition(i))).toEqual(before);
+    expect(before).toEqual([0,.2,.4,.6,.8]);
   });
-  it('never exceeds capacity, frees its slot and wins on the last grain', () => {
-    const cells = new Uint8Array(WIDTH * HEIGHT);
-    cells[(HEIGHT - 1) * WIDTH] = 1;
-    cells[(HEIGHT - 1) * WIDTH + 1] = 1;
-    const game = new Game(fixture(cells, [{ id: 0, color: 1, capacity: 1 }, { id: 1, color: 1, capacity: 1 }]));
-    game.launch(0);
-    game.step();
-    expect(game.collected).toBe(1);
-    expect(game.slots[0]).toBeNull();
-    game.launch(1);
-    expect(game.slots[0]?.id).toBe(1);
-    game.step();
-    expect(game.status).toBe('won');
-    expect(game.collected).toBe(2);
-    expect(game.buckets).toHaveLength(0);
-    expect(game.launch(0)).toBe('finished');
+  it('requires a quiet revolution before declaring a full belt stuck', () => {
+    const cells=new Uint8Array(WIDTH*HEIGHT);cells.fill(1);cells[0]=2;
+    const field=board().map((b,i)=>({...b,color:i<5?2:1,capacity:i<5?1:1}));
+    cells.fill(2,0,5);
+    field[5].capacity=cells.length-15;
+    const g=new Game({cells,field});for(let i=0;i<5;i++)expect(g.launch(i)).toBe('ok');
+    run(g,LOOP_TICKS-1);expect(g.status).toBe('playing');g.step();expect(g.status).toBe('lost');
   });
-  it('conserves grains after simultaneous collection and settling', () => {
-    const game = new Game(createLevel());
-    game.field.slice(0, 4).forEach((bucket) => game.launch(bucket!.id));
-    run(game, LOOP_TICKS * 2);
-    const remaining = game.cells.reduce((count, color) => count + Number(color !== 0), 0);
-    expect(remaining + game.collected).toBe(game.total);
-    expect(game.collected).toBeGreaterThan(0);
-    expect(game.buckets.every((b) => b.filled <= b.capacity)).toBe(true);
+  it('conserves grains and restarts from an unchanged level', () => {
+    const level=createLevel(), g=new Game(level);g.field.slice(0,4).forEach(b=>b&&g.launch(b.id));run(g,720);
+    expect(g.cells.filter(Boolean).length+g.collected).toBe(g.total);
+    expect(g.buckets.every(b=>b.filled<=b.capacity)).toBe(true);
+    expect(new Game(level).collected).toBe(0);expect(level.cells).toEqual(createLevel().cells);
   });
-  it('requires an entire quiet lap before declaring a full belt deadlocked', () => {
-    const game = deadlock();
-    expect(game.launch(5)).toBe('full');
-    run(game, LOOP_TICKS - 1);
-    expect(game.status).toBe('playing');
-    game.step();
-    expect(game.status).toBe('lost');
-    const tick = game.tick;
-    game.step();
-    expect(game.tick).toBe(tick);
+  it('rejects malformed cells, capacities, IDs, dimensions and wall overlaps', () => {
+    const level=createLevel();level.field[0]!.capacity++;
+    expect(()=>new Game(level)).toThrow();
+    expect(()=>new Game({...createLevel(),columns:8})).toThrow();
+    expect(()=>new Game({...createLevel(),walls:[0]})).toThrow();
+    const duplicate=createLevel();duplicate.field[1]!.id=duplicate.field[0]!.id;expect(()=>new Game(duplicate)).toThrow();
   });
-  it('continues with room for another color rather than falsely declaring defeat', () => {
-    const game = new Game(createLevel());
-    game.launch(game.field[0]!.id);
-    run(game, LOOP_TICKS * 3);
-    expect(game.status).toBe('playing');
-  });
-  it('rejects malformed levels and does not mutate the source level', () => {
-    const level = createLevel();
-    const initial = createLevel();
-    const game = new Game(level);
-    game.launch(game.field[3]!.id);
-    run(game, 200);
-    expect(level).toEqual(initial);
-    expect(new Game(level).field).toEqual(initial.field);
-    level.field[0]!.capacity++;
-    expect(() => new Game(level)).toThrow(/вместимостью/);
-    expect(() => new Game({ cells: new Uint8Array(1), field: [] })).toThrow(/размер/);
-    const invalid = createLevel();
-    invalid.cells[0] = 99;
-    expect(() => new Game(invalid)).toThrow(/цвет/);
-    const duplicated = createLevel();
-    duplicated.field[1]!.id = duplicated.field[0]!.id;
-    expect(() => new Game(duplicated)).toThrow(/ведра/);
-  });
-});
-
-describe('speed and solution', () => {
-  it('advances twice as many fixed steps at ×2 for the same elapsed time', () => {
-    const normal = new Game(createLevel());
-    const fast = new Game(createLevel());
-    let a = 0, b = 0;
-    for (let frame = 0; frame < 60; frame++) {
-      a = advanceFrame(normal, 1 / 60, 1, a);
-      b = advanceFrame(fast, 1 / 60, 2, b);
-    }
-    expect(normal.tick).toBe(60);
-    expect(fast.tick).toBe(120);
-    // Switching speed has no effect until simulation time actually passes.
-    const tick = fast.tick;
-    advanceFrame(fast, 0, 1, b);
-    expect(fast.tick).toBe(tick);
-  });
-  it('has the same winning states at ×1 and ×2 for the same simulation-timed actions', () => {
-    const normal = new Game(createLevel());
-    const fast = new Game(createLevel());
-    let a = 0, b = 0, move = 0;
-    for (let tick = 0; tick < shore.victoryTick; tick++) {
-      while (move < shore.solution.length && shore.solution[move].tick === tick) {
-        expect(normal.launch(shore.solution[move].bucketId)).toBe('ok');
-        expect(fast.launch(shore.solution[move].bucketId)).toBe('ok');
-        move++;
-      }
-      a = advanceFrame(normal, 1 / 60, 1, a);
-      b = advanceFrame(fast, 1 / 120, 2, b);
-    }
-    expect(normal.status).toBe('won');
-    expect(fast.status).toBe('won');
-    expect(fast.cells).toEqual(normal.cells);
-    expect(fast.slots).toEqual(normal.slots);
-    expect(fast.collected).toBe(normal.total);
-    expect(fast.tick).toBe(normal.tick);
-  });
-  it('replays the shipped certificate to victory', () => {
-    const result = replay(createLevel(), shore.solution);
-    expect(result.tick).toBe(shore.victoryTick);
-    expect(result.cells.every((color) => color === 0)).toBe(true);
+  it('×2 uses identical steps and events for the same simulation-time actions', () => {
+    const a=new Game(createLevel()),b=new Game(createLevel());const id=a.field[0]!.id;a.launch(id);b.launch(id);
+    let ra=0,rb=0;for(let i=0;i<1000;i++){ra=advanceFrame(a,1/60,1,ra);rb=advanceFrame(b,1/120,2,rb);}
+    expect(a.cells).toEqual(b.cells);expect(a.events).toEqual(b.events);expect(a.slots).toEqual(b.slots);
   });
 });

@@ -1,7 +1,17 @@
-import { createArtwork } from './artwork';
-import shore from './levels/shore.json';
-import type { Level } from './game';
+import fallbacks from './levels/fallbacks.json';
+import { asLevel, difficulty, GENERATOR_VERSION, seedFor, type GeneratedLevel } from './generator';
+import { Game } from './game';
 
-export function createLevel(): Level {
-  return { cells: createArtwork(), field: shore.field.map((bucket) => ({ ...bucket })) };
+export function fallbackLevel(number: number, seed = seedFor(number)): GeneratedLevel {
+  return { ...fallbacks[difficulty(number)], number, seed, fallback: true };
+}
+export function createLevel() { return asLevel(fallbackLevel(1)); }
+export function validRecord(record: unknown, number: number, seed: number): record is GeneratedLevel {
+  try {
+    const r = record as GeneratedLevel;
+    if (!r || r.version !== GENERATOR_VERSION || r.number !== number || r.seed !== seed || r.columns !== difficulty(number) + 4 ||
+        !Array.isArray(r.cells) || r.cells.some(c => !Number.isInteger(c) || c < 1 || c > 4)) return false;
+    new Game(asLevel(r));
+    return true;
+  } catch { return false; }
 }
