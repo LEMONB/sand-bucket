@@ -12,7 +12,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
-    "generate:level": "node --experimental-strip-types scripts/generate-level.ts"
+    "generate:level": "node --experimental-strip-types scripts/generate-level.ts",
+    "test:full": "SAND_BUCKET_FULL_TESTS=1 vitest run"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
