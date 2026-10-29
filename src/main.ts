@@ -1,7 +1,11 @@
 import './style.css';
 import './interface.css';
+import './mechanics.css';
+import { FieldView } from './field-view';
+import { ART_TITLES } from './art-catalog';
+import { MECHANIC_HINTS } from './mechanics';
 import { bucketIcon } from './bucket-icon';
-import { Game, PALETTE, COLOR_NAMES, advanceFrame, type Speed } from './game';
+import { Game, advanceFrame, type Speed } from './game';
 import { asLevel, DIFFICULTIES, difficulty, type GeneratedLevel } from './generator';
 import { fallbackLevel } from './level';
 import { GameRenderer, paintSand } from './renderer';
@@ -20,24 +24,28 @@ root.innerHTML=`<section id="menu" class="menu" aria-label="Главное ме�
 <div class="level-card"><div class="preview-wrap"><canvas id="preview" width="128" height="128" aria-hidden="true"></canvas><span id="menu-number" class="level-badge"></span></div><div class="level-description"><h2 id="menu-title"></h2><span id="menu-difficulty" class="level-state"></span></div></div>
 <button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p></section>
 <section id="game" class="mock-game" hidden aria-label="Игра">
-<header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span id="level-number" class="mock-brand"></span><span id="difficulty"></span></header>
+<header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span id="level-number" class="mock-brand"></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
 <div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div>
 <div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
 const lossScenario=import.meta.env.DEV&&new URLSearchParams(location.search).get('scenario')==='loss';
+const requestedLevel=import.meta.env.DEV?Number(new URLSearchParams(location.search).get('level')):0;
+let devLevel=Number.isSafeInteger(requestedLevel)&&requestedLevel>0?requestedLevel:0;
 let record:GeneratedLevel=progress.data.current??fallbackLevel(progress.data.number);
 let game=new Game(asLevel(record));
 let initialized=false,loading=false,visible=false,paused=false,finished=false,wonSaved=false;
 let accumulator=0, speed:Speed=progress.data.speed, lastPercent=-1,lastCount=-1;
-let buttons:HTMLButtonElement[]=[];
+const fieldView=new FieldView(el('field'),el('sand'));
+const shownMechanics=new Set<number>();
 function storageNote():void {if(!progress.available)el('offline-note').textContent='Браузер не разрешает сохранять прогресс.';}
 function menu():void {
   el('menu-number').textContent=String(progress.data.number);
   el('menu-title').textContent=`Уровень ${progress.data.number}`;
   el('menu-difficulty').textContent=DIFFICULTIES[difficulty(progress.data.number)];
-  paintSand(el<HTMLCanvasElement>('preview').getContext('2d')!,asLevel(progress.data.current??fallbackLevel(progress.data.number)).cells);
+  const preview=asLevel(progress.data.current??fallbackLevel(progress.data.number));
+  paintSand(el<HTMLCanvasElement>('preview').getContext('2d')!,preview.cells,preview.palette);
   storageNote();
 }
 function setSpeed(value:Speed):void {
@@ -45,19 +53,14 @@ function setSpeed(value:Speed):void {
   const button=el('demo-speed');button.firstElementChild!.textContent=`×${value}`;button.setAttribute('aria-pressed',String(value===2));
   button.setAttribute('aria-label',value===1?'Ускорить в два раза':'Вернуть обычную скорость');storageNote();
 }
-function updateField():void {
-  for(const button of buttons){
-    const position=Number(button.dataset.position),bucket=game.field[position],available=Boolean(bucket)&&game.paths.has(position);
-    button.disabled=!available;
-    button.classList.toggle('is-empty',!bucket);button.classList.toggle('is-blocked',Boolean(bucket)&&!available);button.classList.toggle('is-available',available);
-    button.setAttribute('aria-label',bucket?`${COLOR_NAMES[bucket.color]} ведро, ряд ${Math.floor(position/game.columns)+1}, место ${position%game.columns+1}, ${available?'доступно':'проход закрыт'}`:'Пустое место');
-  }
-  const focused=document.activeElement;
-  if(focused instanceof HTMLButtonElement&&focused.disabled&&buttons.includes(focused))buttons.find(b=>!b.disabled)?.focus({preventScroll:true});
-}
-function buildField():void {
-  el('field').innerHTML=game.field.map((bucket,i)=>game.walls.has(i)?'<div class="mock-wall" role="img" aria-label="Стена"></div>':`<button class="field-bucket" data-position="${i}" style="--color:${PALETTE[bucket!.color]}"><span class="bucket-shape">${bucketIcon}</span></button>`).join('');
-  buttons=[...el('field').querySelectorAll<HTMLButtonElement>('button')];updateField();
+function updateField():void { fieldView.draw(game); }
+function buildField():void { fieldView.reset(game); }
+function explainMechanics():void {
+  const kinds=record.kinds??[];
+  if(!kinds.length)return;
+  paused=true;sand.app.ticker.stop();
+  dialog('Новый ход',kinds.map(k=>MECHANIC_HINTS[k]).join(' '),'Играть',()=>{paused=false;el('overlay').hidden=true;accumulator=0;sand.app.ticker.start();});
+  kinds.forEach(k=>shownMechanics.add(k));
 }
 function hud():void {
   const percent=Math.floor(game.collected/game.total*100),count=game.slots.reduce((n,b)=>n+Number(Boolean(b)),0);
@@ -83,15 +86,15 @@ async function start():Promise<void> {
   if(loading)return;loading=true;const play=el<HTMLButtonElement>('play');play.disabled=true;play.textContent='Готовим песок…';
   el<HTMLButtonElement>('result-action').disabled=true;
   try {
-    record=await loader.get(progress.data.number);
+    record=await loader.get(devLevel||progress.data.number);
     if(!initialized){
       await sand.init(el('sand'));initialized=true;
       sand.app.ticker.add(ticker=>{
         if(!visible||paused||document.hidden){accumulator=0;return;}
         const dt=Math.min(ticker.deltaMS/1000,.1)*speed;
         accumulator=advanceFrame(game,ticker.deltaMS/1000,speed,accumulator);
-        sand.draw(game);belt.draw(game,dt);hud();
-        if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;progress.advance();menu();}
+        sand.draw(game);belt.draw(game,dt);updateField();el('field').classList.toggle('is-changing',game.tick<game.busyUntil);hud();
+        if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;if(devLevel)devLevel++;else if(!lossScenario)progress.advance();menu();}
         if(game.status!=='playing'&&!finished&&!belt.busy){
           finished=true;sand.app.ticker.stop();
           if(game.status==='won')dialog('До последней песчинки.','Следующий узор уже ждёт.','Следующий',()=>void start());
@@ -103,7 +106,9 @@ async function start():Promise<void> {
       });
     }
     visible=true;el('menu').hidden=true;el('game').hidden=false;root.classList.add('playing');reset();el('restart').focus();
-    void loader.get(progress.data.number+1);
+    el('sand').setAttribute('aria-label',ART_TITLES[record.art??0]);
+    if((record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics();
+    void loader.get((devLevel||progress.data.number)+1);
   } catch(error){
     console.error(error);el('offline-note').textContent='Не удалось запустить игру. Обнови страницу.';
   } finally {loading=false;play.disabled=false;play.textContent='Играть →';el<HTMLButtonElement>('result-action').disabled=false;}
@@ -121,7 +126,8 @@ el('field').addEventListener('click',event=>{
 el('play').addEventListener('click',()=>void start());el('home').addEventListener('click',home);el('result-home').addEventListener('click',home);
 el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing')reset();});
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
-window.addEventListener('resize',()=>{if(visible){belt.measure();belt.draw(game,0);}});
+el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
+window.addEventListener('resize',()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0);}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape')pause();
@@ -132,7 +138,7 @@ document.addEventListener('keydown',event=>{
   }
 });
 setSpeed(speed);menu();
-if(lossScenario)void start();
+if(lossScenario||devLevel)void start();
 if(import.meta.env.PROD&&'serviceWorker'in navigator){
   window.addEventListener('load',()=>{
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{scope:import.meta.env.BASE_URL}).then(async registration=>{

@@ -1,5 +1,5 @@
 import { bucketIcon } from './bucket-icon';
-import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, PALETTE, type Game, type GameEvent } from './game';
+import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent } from './game';
 
 export class BeltView {
   private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number }[][] = [];
@@ -62,7 +62,7 @@ export class BeltView {
       const effect=this.effects.find(e=>!e.active);
       if(!effect)continue;
       effect.active=true;effect.event=event;effect.started=this.clock;effect.element.hidden=false;
-      effect.element.style.color=PALETTE[event.bucket.color];
+      effect.element.style.color=game.palette[event.bucket.color];
       effect.element.classList.toggle('completion',event.type==='complete');
       effect.element.style.width=`${event.type==='complete'?48:this.grainSize}px`;
     }
@@ -76,7 +76,7 @@ export class BeltView {
         const x=(fragment===0?position:position+(position<.5?1:-1))*this.beltRect.width;
         view.slot.style.transform=`translateX(${x-27}px)`;
         view.bucket.hidden=!visible;
-        if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=PALETTE[bucket.color];}
+        if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=game.palette[bucket.color];}
         if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
       }
     }
@@ -91,7 +91,7 @@ export class BeltView {
       const x=this.reduced.matches?targetX:grain.x+(targetX-grain.x)*t+grain.jitter*Math.sin(t*Math.PI);
       const y=this.reduced.matches?targetY:grain.y+(targetY-grain.y)*t*t;
       ctx.globalAlpha=this.reduced.matches ? .45*(1-t) : 1;
-      ctx.fillStyle=PALETTE[grain.color];ctx.fillRect(x-1.5,y-1.5,3,3);
+      ctx.fillStyle=game.palette[grain.color];ctx.fillRect(x-1.5,y-1.5,3,3);
     }
     ctx.globalAlpha=1;
     for(const effect of this.effects) {
