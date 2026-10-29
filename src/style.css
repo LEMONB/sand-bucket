@@ -60,7 +60,7 @@ progress::-moz-progress-bar { background: #69aa91; }
 .bucket-shape svg { display: block; width: 100%; height: 100%; }
 .field-bucket.is-available { background: #faf9f033; }
 .field-bucket.is-available:hover { background: #ffffff99; }
-.field-bucket.is-available:active .bucket-shape { transform: translateY(-4px); }
+.field-bucket.is-available:active .bucket-shape { transform: translateY(2px) scale(1.05, .92); transition-duration: 80ms; }
 .field-bucket:disabled { cursor: default; opacity: 1; }
 .field-bucket.is-blocked .bucket-shape { transform: rotate(180deg) scale(.7); }
 .field-bucket.is-empty .bucket-shape { opacity: 0; }

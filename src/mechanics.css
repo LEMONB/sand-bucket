@@ -21,3 +21,7 @@
 #mechanic-help { margin-left: auto; }
 .mock-field .on-surface.is-available { background: transparent; }
 .mock-field .on-surface.is-available:hover { background: #fff2; }
+
+.gate-surface { z-index: 2; border: 0; border-radius: 5px; color: #fffaf2; background: repeating-linear-gradient(90deg,#6a8176 0 6px,#b3bfb0 6px 10px); }
+.flying-rope { position: fixed; z-index: 29; }
+.sand-lid { transform-origin: 15% 0; }

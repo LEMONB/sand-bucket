@@ -24,13 +24,16 @@ describe('routes and walls', () => {
 });
 describe('simulation', () => {
   it('reserves the first slot immediately, opens a route and only collects after arrival', () => {
-    const level=fixture([1], [{id:0,color:1,capacity:1}]); const g=new Game(level);
+    const level=fixture([1], [{id:0,color:1,capacity:1}]);
+    const arrivalX=Math.floor(LAUNCH_TICKS/LOOP_TICKS*WIDTH);
+    level.cells.fill(0);level.cells[(HEIGHT-1)*WIDTH+arrivalX]=1;
+    const g=new Game(level);
     expect(g.launch(0)).toBe('ok'); expect(g.slots[0]?.id).toBe(0); expect(g.field[0]).toBeNull();
     expect(g.events[0].path).toEqual([0]); run(g,LAUNCH_TICKS-1); expect(g.collected).toBe(0);
     g.step(); expect(g.collected).toBe(1); expect(g.status).toBe('won'); expect(g.slots[0]).toBeNull();
     expect(g.events.map(e=>e.type)).toEqual(['launch','arrive','collect','complete']);
     expect(g.events[2].amount).toBe(1);
-    expect(g.events[2].from).toEqual({x:4.5/WIDTH,y:(HEIGHT-.5)/HEIGHT});
+    expect(g.events[2].from).toEqual({x:(arrivalX+.5)/WIDTH,y:(HEIGHT-.5)/HEIGHT});
     expect(level.field[0]?.id).toBe(0);
   });
   it('collects five rows through other colors, excludes sixth row and respects capacity', () => {
@@ -46,13 +49,13 @@ describe('simulation', () => {
     expect(g.slots.map((_,i)=>g.slotPosition(i))).toEqual(before);
     expect(before).toEqual([0,.2,.4,.6,.8]);
   });
-  it('requires a quiet revolution before declaring a full belt stuck', () => {
+  it('detects a stuck belt as soon as buckets arrive, without waiting a revolution', () => {
     const cells=new Uint8Array(WIDTH*HEIGHT);cells.fill(1);cells[0]=2;
     const field=board().map((b,i)=>({...b,color:i<5?2:1,capacity:i<5?1:1}));
     cells.fill(2,0,5);
     field[5].capacity=cells.length-15;
     const g=new Game({cells,field});for(let i=0;i<5;i++)expect(g.launch(i)).toBe('ok');
-    run(g,LOOP_TICKS-1);expect(g.status).toBe('playing');g.step();expect(g.status).toBe('lost');
+    run(g,LAUNCH_TICKS-1);expect(g.status).toBe('playing');g.step();expect(g.status).toBe('lost');
   });
   it('conserves grains and restarts from an unchanged level', () => {
     const level=createLevel(), g=new Game(level);g.field.slice(0,4).forEach(b=>b&&g.launch(b.id));run(g,720);
@@ -72,4 +75,24 @@ describe('simulation', () => {
     let ra=0,rb=0;for(let i=0;i<1000;i++){ra=advanceFrame(a,1/60,1,ra);rb=advanceFrame(b,1/120,2,rb);}
     expect(a.cells).toEqual(b.cells);expect(a.events).toEqual(b.events);expect(a.slots).toEqual(b.slots);
   });
+});
+
+it('waits for distant matching grains and for sand still falling',()=>{
+  for(const row of [0,HEIGHT-1]){
+    const cells=new Uint8Array(WIDTH*HEIGHT);
+    for(let x=120;x<125;x++)cells[row*WIDTH+x]=1;
+    const field=Array<BucketSpec|null>(16).fill(null);
+    for(let i=0;i<5;i++)field[i]={id:i,color:1,capacity:1};
+    const game=new Game({cells,field});for(let i=0;i<5;i++)game.launch(i);
+    run(game,LAUNCH_TICKS);expect(game.status).toBe('playing');
+    run(game,LOOP_TICKS+HEIGHT);expect(game.status).toBe('won');
+  }
+});
+it('does not count sand held under a lid as collectable',()=>{
+  const cells=new Uint8Array(WIDTH*HEIGHT);cells.fill(1);
+  const field=Array<BucketSpec|null>(16).fill(null);
+  for(let i=0;i<5;i++)field[i]={id:i,color:1,capacity:i===4?cells.length-12000:3000};
+  const game=new Game({cells,field,mechanics:{queues:[],platforms:[],trays:[],bridges:[],gates:[],links:[],lids:[{x:0,y:HEIGHT-5,width:WIDTH,height:5,key:0}]}});
+  for(let i=0;i<5;i++)game.launch(i);
+  run(game,LAUNCH_TICKS);expect(game.status).toBe('lost');
 });

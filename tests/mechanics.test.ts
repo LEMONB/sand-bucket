@@ -1,5 +1,5 @@
 import { expect,it } from 'vitest';
-import { Game, WIDTH, HEIGHT, type BucketSpec, type Level } from '../src/game';
+import { Game, WIDTH, HEIGHT, LAUNCH_TICKS, type BucketSpec, type Level } from '../src/game';
 import { emptyMechanics } from '../src/mechanics';
 
 const bucket=(id:number,color=1,capacity=20):BucketSpec=>({id,color,capacity});
@@ -12,7 +12,7 @@ function fixture(entries:Record<number,BucketSpec>, change:(level:Level)=>void=(
   for(const b of [...field,...level.mechanics!.queues.flatMap(q=>q.buckets),...level.mechanics!.platforms.flatMap(p=>p.next)])if(b)for(let i=0;i<b.capacity;i++)level.cells[cursor--]=b.color;
   return level;
 }
-function advance(game:Game,ticks=28):void {for(let i=0;i<ticks;i++)game.step();}
+function advance(game:Game,ticks=LAUNCH_TICKS+10):void {for(let i=0;i<ticks;i++)game.step();}
 
 it('queues reveal one bucket after departure and do not exceed five',()=>{
   const level=fixture({0:bucket(0)},l=>{l.mechanics!.queues=[{cell:0,buckets:[bucket(1),bucket(2),bucket(3),bucket(4)]}];});
@@ -39,10 +39,10 @@ it('removes the whole bridge when its last bucket departs',()=>{
 });
 it('sends a linked pair as one turn, or the clicked bucket alone when one slot remains',()=>{
   const level=fixture({0:bucket(0),1:bucket(1)},l=>{l.mechanics!.links=[[0,1]];});
-  const pair=new Game(level);pair.launch(1);expect(pair.slots.filter(Boolean).map(b=>b!.id)).toEqual([1,0]);expect(pair.turns).toBe(1);
+  const pair=new Game(level);pair.launch(1);expect(pair.slots.filter(Boolean).map(b=>b!.id)).toEqual([1,0]);expect(pair.turns).toBe(1);expect(pair.events.map(e=>e.partnerId)).toEqual([0,1]);
   const single=new Game(level);
-  for(let i=0;i<4;i++)single.slots[i]={...bucket(10+i),filled:0,arrivalTick:18};
-  expect(single.launch(1)).toBe('ok');expect(single.field[0]?.id).toBe(0);expect(single.mechanics.links).toHaveLength(0);
+  for(let i=0;i<4;i++)single.slots[i]={...bucket(10+i),filled:0,arrivalTick:LAUNCH_TICKS};
+  expect(single.launch(1)).toBe('ok');expect(single.field[0]?.id).toBe(0);expect(single.mechanics.links).toHaveLength(0);expect(single.events[0].partnerId).toBeUndefined();
   expect(single.launch(0)).toBe('full');expect(single.turns).toBe(1);
 });
 it('keeps the chosen color on the belt and alternates only remaining buckets',()=>{
