@@ -1,5 +1,6 @@
 import './style.css';
-import { BELT_LIMIT, COLOR_NAMES, Game, HEIGHT, PALETTE, WIDTH, createLevel } from './game';
+import { BELT_LIMIT, COLOR_NAMES, Game, PALETTE, accessibleCells, advanceFrame, type Speed } from './game';
+import { createLevel } from './level';
 import { GameRenderer, paintSand } from './renderer';
 
 const STORAGE_KEY = 'sand-bucket.progress.v1';
@@ -28,12 +29,11 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   </section>
   <section id="game" class="game" hidden aria-label="Уровень 1: Тихий берег">
     <header class="game-header"><button id="home" class="icon-button" aria-label="Вернуться в меню"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 6-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="game-title"><span class="eyebrow">УРОВЕНЬ 01</span><h2>Тихий берег</h2></div><button id="restart" class="icon-button" aria-label="Начать уровень заново"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7M5 3v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></header>
-    <div class="progress-row"><span>Собрано <strong id="percent">0%</strong></span><span class="slots"><i></i>На ленте <strong id="slots">0 / 5</strong></span></div>
+    <div class="progress-row"><strong id="percent" aria-label="Собрано песка">0%</strong><span class="slots" aria-label="Занято мест на ленте"><i></i><strong id="slots">0 / 5</strong></span></div>
     <progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress>
-    <div id="stage" class="stage"></div>
-    <div class="queue-heading"><span class="eyebrow">ТВОИ ВЁДРА</span><span>Нажми, чтобы отправить</span></div>
-    <div id="queues" class="queues" aria-label="Очереди вёдер"></div>
-    <p id="hint" class="hint" role="status">Начни с мятного песка у нижнего края.</p>
+    <div class="play-area"><div id="stage" class="stage"></div><div class="belt-tools"><button id="speed" class="speed-button" aria-label="Ускорить игру в два раза" aria-pressed="false">×1</button></div></div>
+    <div id="field" class="bucket-field" role="group" aria-label="Поле вёдер, 4 ряда по 4"></div>
+    <p id="hint" class="hint" role="status"></p>
     <div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-copy"><div id="result-icon" class="result-icon">✦</div><span id="result-eyebrow" class="eyebrow"></span><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">К уровням</button></section></div>
   </section>
 `;
@@ -45,7 +45,8 @@ function element<T extends HTMLElement = HTMLElement>(id: string): T {
 const preview = element<HTMLCanvasElement>('preview');
 paintSand(preview.getContext('2d')!, createLevel().cells);
 const renderer = new GameRenderer();
-let game = new Game();
+let game = new Game(createLevel());
+let speed: Speed = 1;
 let initialized = false;
 let loading = false;
 let visible = false;
@@ -54,34 +55,57 @@ let accumulator = 0;
 let shownStatus = game.status;
 let hintUntil = 0;
 
-function renderQueues(): void {
-  element('queues').innerHTML = game.queues.map((queue, lane) => {
-    if (!queue.length) {
-      return '<div class="queue empty"><span>✓</span><small>Все на ленте</small></div>';
-    }
-    return `<div class="queue">${queue.slice(1).reverse().map((bucket, index) =>
-      `<div class="waiting-bucket" style="--color:${PALETTE[bucket.color]};--depth:${queue.length - 1 - index}">${bucketIcon}</div>`,
-    ).join('')}<button class="bucket-button" data-lane="${lane}" style="--color:${PALETTE[queue[0].color]}" aria-label="${COLOR_NAMES[queue[0].color]} ведро, очередь ${lane + 1}. Отправить на ленту">${bucketIcon}<span>${COLOR_NAMES[queue[0].color]}</span></button></div>`;
-  }).join('');
-  element('queues').querySelectorAll<HTMLButtonElement>('[data-lane]').forEach((button) => {
+function buildField(): void {
+  element('field').innerHTML = game.field.map((bucket, position) =>
+    `<button class="field-bucket" data-position="${position}" style="--color:${PALETTE[bucket!.color]}"><span class="bucket-shape">${bucketIcon}</span></button>`,
+  ).join('');
+  element('field').querySelectorAll<HTMLButtonElement>('[data-position]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (paused || !visible) {
-        return;
-      }
-      const lane = Number(button.dataset.lane);
-      const result = game.launch(lane);
+      if (paused || !visible) return;
+      const bucket = game.field[Number(button.dataset.position)];
+      if (!bucket) return;
+      const result = game.launch(bucket.id);
       if (result === 'ok') {
-        renderQueues();
-        element<HTMLButtonElement>('queues').querySelector<HTMLButtonElement>(`[data-lane="${lane}"]`)?.focus({ preventScroll: true });
+        updateField();
         updateHud();
-        setHint('Полное ведро уйдёт с ленты и освободит место.');
-      } else if (result === 'entrance') {
-        setHint('Секунду — дай ведру освободить вход.');
+        element('hint').textContent = '';
       } else if (result === 'full') {
-        setHint('На ленте пять вёдер. Подожди, пока одно наполнится.');
+        setHint('Все пять слотов заняты. Подожди, пока ведро наполнится.');
+      } else if (result === 'blocked') {
+        setHint('Сначала освободи проход к ленте.');
       }
     });
   });
+  updateField();
+}
+
+function updateField(): void {
+  const accessible = accessibleCells(game.field);
+  const focused = document.activeElement;
+  const buttons = [...element('field').querySelectorAll<HTMLButtonElement>('[data-position]')];
+  for (const button of buttons) {
+    const position = Number(button.dataset.position);
+    const bucket = game.field[position];
+    const available = Boolean(bucket) && accessible.has(position);
+    button.disabled = !available;
+    button.classList.toggle('is-empty', !bucket);
+    button.classList.toggle('is-blocked', Boolean(bucket) && !available);
+    button.classList.toggle('is-available', available);
+    button.setAttribute('aria-label', bucket
+      ? `${COLOR_NAMES[bucket.color]} ведро. Ряд ${Math.floor(position / 4) + 1}, место ${position % 4 + 1}. ${available ? 'Есть проход. Отправить на ленту' : 'Перевёрнуто: проход закрыт'}`
+      : `Пустое место, ряд ${Math.floor(position / 4) + 1}, место ${position % 4 + 1}`);
+  }
+  if (focused instanceof HTMLButtonElement && focused.disabled && buttons.includes(focused)) {
+    buttons.find((button) => !button.disabled)?.focus({ preventScroll: true });
+  }
+}
+
+function setSpeed(value: Speed): void {
+  speed = value;
+  const button = element<HTMLButtonElement>('speed');
+  button.textContent = `×${speed}`;
+  button.setAttribute('aria-pressed', String(speed === 2));
+  button.setAttribute('aria-label', speed === 1 ? 'Ускорить игру в два раза' : 'Вернуть обычную скорость');
 }
 
 function setHint(message: string): void {
@@ -95,7 +119,7 @@ function updateHud(): void {
   element<HTMLProgressElement>('progress').value = percent;
   element('slots').textContent = `${game.buckets.length} / ${BELT_LIMIT}`;
   if (game.tick > hintUntil && game.tick > 240) {
-    element('hint').textContent = 'Выбирай цвет песка у нижнего края. Оставляй место на ленте.';
+    element('hint').textContent = '';
   }
 }
 
@@ -137,7 +161,8 @@ function saveCompletion(): void {
 }
 
 function reset(): void {
-  game = new Game();
+  game = new Game(createLevel());
+  setSpeed(1);
   shownStatus = 'playing';
   accumulator = 0;
   paused = false;
@@ -145,9 +170,9 @@ function reset(): void {
   element('overlay').hidden = true;
   renderer.reset();
   renderer.draw(game);
-  renderQueues();
+  buildField();
   updateHud();
-  element('hint').textContent = 'Начни с мятного песка у нижнего края.';
+  element('hint').textContent = '';
   renderer.app.ticker.start();
 }
 
@@ -168,11 +193,7 @@ async function start(): Promise<void> {
           accumulator = 0;
           return;
         }
-        accumulator += Math.min(ticker.deltaMS / 1000, 0.1);
-        while (accumulator >= 1 / 60) {
-          game.step();
-          accumulator -= 1 / 60;
-        }
+        accumulator = advanceFrame(game, ticker.deltaMS / 1000, speed, accumulator);
         renderer.draw(game);
         updateHud();
         if (shownStatus !== game.status) {
@@ -228,6 +249,9 @@ element('level-card').addEventListener('click', () => element('play').focus());
 element('home').addEventListener('click', home);
 element('result-home').addEventListener('click', home);
 element('restart').addEventListener('click', reset);
+element('speed').addEventListener('click', () => {
+  if (visible && !paused && game.status === 'playing') setSpeed(speed === 1 ? 2 : 1);
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && initialized && visible && game.status === 'playing') {
     paused = true;
