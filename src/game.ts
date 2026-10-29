@@ -31,11 +31,13 @@ export type LaunchResult = 'ok' | 'full' | 'blocked' | 'empty' | 'finished';
 export type Speed = 1 | 2;
 
 export interface GameEvent {
-  type: 'launch' | 'arrive' | 'complete';
+  type: 'launch' | 'arrive' | 'complete' | 'collect';
   tick: number;
   slot: number;
   bucket: Bucket;
   path?: number[];
+  from?: { x: number; y: number };
+  amount?: number;
 }
 
 export function exitPaths(field: readonly (BucketSpec | null)[], columns = FIELD_COLUMNS, walls: ReadonlySet<number> = new Set()): Map<number, number[]> {
@@ -153,11 +155,14 @@ export class Game {
       const bucket = this.slots[slot];
       if (!bucket || this.tick < bucket.arrivalTick) continue;
       if (this.tick === bucket.arrivalTick) this.events.push({ type: 'arrive', tick: this.tick, slot, bucket: { ...bucket } });
+      const beforeFill = bucket.filled;
+      let sourceX = 0, sourceY = 0;
       const center = Math.floor(this.slotPosition(slot) * WIDTH);
       for (let y = HEIGHT - 1; y >= HEIGHT - COLLECTION_DEPTH && bucket.filled < bucket.capacity; y--) {
         for (let x = Math.max(0, center - 7); x <= Math.min(WIDTH - 1, center + 7) && bucket.filled < bucket.capacity; x++) {
           const index = y * WIDTH + x;
           if (this.cells[index] === bucket.color) {
+            sourceX += x; sourceY += y;
             this.cells[index] = 0;
             bucket.filled++;
             this.collected++;
@@ -165,6 +170,8 @@ export class Game {
           }
         }
       }
+      const amount = bucket.filled - beforeFill;
+      if (amount) this.events.push({ type: 'collect', tick: this.tick, slot, bucket: { ...bucket }, amount, from: { x: (sourceX / amount + .5) / WIDTH, y: (sourceY / amount + .5) / HEIGHT } });
       if (bucket.filled === bucket.capacity) {
         this.events.push({ type: 'complete', tick: this.tick, slot, bucket: { ...bucket } });
         this.slots[slot] = null;

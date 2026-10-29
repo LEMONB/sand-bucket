@@ -8,6 +8,7 @@ import { GameRenderer, paintSand } from './renderer';
 import { BeltView } from './belt-view';
 import { ProgressStore } from './progress';
 import { LevelLoader } from './level-loader';
+import { createLossScenario } from './dev-scenarios';
 
 let storage: Pick<Storage,'getItem'|'setItem'>;
 try { storage=localStorage; } catch { storage={getItem(){throw Error();},setItem(){throw Error();}}; }
@@ -24,7 +25,8 @@ root.innerHTML=`<section id="menu" class="menu" aria-label="Главное ме�
 <div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
-const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'));
+const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
+const lossScenario=import.meta.env.DEV&&new URLSearchParams(location.search).get('scenario')==='loss';
 let record:GeneratedLevel=progress.data.current??fallbackLevel(progress.data.number);
 let game=new Game(asLevel(record));
 let initialized=false,loading=false,visible=false,paused=false,finished=false,wonSaved=false;
@@ -63,10 +65,10 @@ function hud():void {
   if(count!==lastCount){lastCount=count;el('count').textContent=`${count} / 5`;}
 }
 function reset():void {
-  game=new Game(asLevel(record));accumulator=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
+  game=new Game(lossScenario?createLossScenario():asLevel(record));accumulator=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
   root.style.setProperty('--columns',String(game.columns));el('overlay').hidden=true;
-  el('level-number').textContent=`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=DIFFICULTIES[difficulty(record.number)];
-  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();sand.draw(game);belt.draw(game,0);hud();sand.app.ticker.start();
+  el('level-number').textContent=`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=lossScenario?'Проверка проигрыша':DIFFICULTIES[difficulty(record.number)];
+  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
   el('result-title').textContent=title;el('result-copy').textContent=copy;el('result-action').textContent=action;
@@ -130,6 +132,7 @@ document.addEventListener('keydown',event=>{
   }
 });
 setSpeed(speed);menu();
+if(lossScenario)void start();
 if(import.meta.env.PROD&&'serviceWorker'in navigator){
   window.addEventListener('load',()=>{
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{scope:import.meta.env.BASE_URL}).then(async registration=>{

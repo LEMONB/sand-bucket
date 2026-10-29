@@ -4,12 +4,19 @@ import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, PALETTE, type Game, type GameEven
 export class BeltView {
   private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number }[][] = [];
   private readonly effects: { element: HTMLElement; active: boolean; event?: GameEvent; started: number }[] = [];
+  private readonly stream = document.createElement('canvas');
+  private readonly streamContext = this.stream.getContext('2d')!;
+  private readonly grains = Array.from({ length: 120 }, () => ({ active: false, born: 0, x: 0, y: 0, slot: 0, color: 1, jitter: 0 }));
+  private nextGrain = 0;
+  private sandRect!: DOMRect;
+  private streamTop = 0;
   private clock = 0;
   private beltRect!: DOMRect;
   private cells: {x:number;y:number}[] = [];
   private grainSize = 32;
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  constructor(private belt: HTMLElement, private field: HTMLElement) {
+  constructor(private belt: HTMLElement, private field: HTMLElement, private sand: HTMLElement) {
+    this.stream.className = 'sand-stream'; this.stream.setAttribute('aria-hidden', 'true'); document.body.append(this.stream);
     for(let slot=0;slot<BELT_LIMIT;slot++) {
       const views=[];
       for(let fragment=0;fragment<2;fragment++) {
@@ -29,16 +36,29 @@ export class BeltView {
   }
   measure(): void {
     this.beltRect=this.belt.getBoundingClientRect();
+    this.sandRect=this.sand.getBoundingClientRect();
+    this.streamTop=this.sandRect.bottom-this.sandRect.height*5/128-8;
+    this.stream.width=Math.ceil(this.beltRect.width);
+    this.stream.height=Math.ceil(this.beltRect.bottom-this.streamTop);
+    this.stream.style.left=`${this.beltRect.left}px`;this.stream.style.top=`${this.streamTop}px`;
     this.cells=[...this.field.children].map(element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
     const shape=this.field.querySelector('.bucket-shape');
     if(shape)this.grainSize=shape.getBoundingClientRect().width;
   }
-  reset(): void { for(const effect of this.effects){effect.active=false;effect.element.hidden=true;} }
+  reset(): void { this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
   draw(game: Game, seconds: number): void {
     this.clock+=seconds;
     for(const event of game.events) {
       if(event.type==='arrive')continue;
+      if(event.type==='collect') {
+        for(let i=0;i<Math.min(3,event.amount!);i++) {
+          const grain=this.grains[this.nextGrain++%this.grains.length];
+          Object.assign(grain,{active:true,born:this.clock-i*.025,x:this.sandRect.left+4+event.from!.x*(this.sandRect.width-8)-this.beltRect.left,
+            y:this.sandRect.top+4+event.from!.y*(this.sandRect.height-8)-this.streamTop,slot:event.slot,color:event.bucket.color,jitter:(i-1)*3});
+        }
+        continue;
+      }
       const effect=this.effects.find(e=>!e.active);
       if(!effect)continue;
       effect.active=true;effect.event=event;effect.started=this.clock;effect.element.hidden=false;
@@ -60,6 +80,20 @@ export class BeltView {
         if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
       }
     }
+    const ctx=this.streamContext;
+    ctx.clearRect(0,0,this.stream.width,this.stream.height);
+    for(const grain of this.grains) {
+      if(!grain.active)continue;
+      const t=(this.clock-grain.born)/.22;
+      if(t>=1){grain.active=false;continue;}
+      const targetX=game.slotPosition(grain.slot)*this.beltRect.width;
+      const targetY=this.beltRect.top+25-this.streamTop;
+      const x=this.reduced.matches?targetX:grain.x+(targetX-grain.x)*t+grain.jitter*Math.sin(t*Math.PI);
+      const y=this.reduced.matches?targetY:grain.y+(targetY-grain.y)*t*t;
+      ctx.globalAlpha=this.reduced.matches ? .45*(1-t) : 1;
+      ctx.fillStyle=PALETTE[grain.color];ctx.fillRect(x-1.5,y-1.5,3,3);
+    }
+    ctx.globalAlpha=1;
     for(const effect of this.effects) {
       if(!effect.active)continue;
       const event=effect.event!,complete=event.type==='complete';

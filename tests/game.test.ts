@@ -28,7 +28,9 @@ describe('simulation', () => {
     expect(g.launch(0)).toBe('ok'); expect(g.slots[0]?.id).toBe(0); expect(g.field[0]).toBeNull();
     expect(g.events[0].path).toEqual([0]); run(g,LAUNCH_TICKS-1); expect(g.collected).toBe(0);
     g.step(); expect(g.collected).toBe(1); expect(g.status).toBe('won'); expect(g.slots[0]).toBeNull();
-    expect(g.events.map(e=>e.type)).toEqual(['launch','arrive','complete']);
+    expect(g.events.map(e=>e.type)).toEqual(['launch','arrive','collect','complete']);
+    expect(g.events[2].amount).toBe(1);
+    expect(g.events[2].from).toEqual({x:4.5/WIDTH,y:(HEIGHT-.5)/HEIGHT});
     expect(level.field[0]?.id).toBe(0);
   });
   it('collects five rows through other colors, excludes sixth row and respects capacity', () => {

@@ -45,3 +45,4 @@
 .slot-bucket small { position: absolute; top: 28px; left: 0; width: 100%; text-align: center; font-size: 8px; font-weight: 700; color: #36554a; }
 .sparkles { display: none; position: absolute; top: -8px; left: -8px; width: 66px; text-align: center; color: #d0ac48; font-size: 20px; }
 .completion .sparkles { display: block; }
+.sand-stream { position: fixed; z-index: 4; pointer-events: none; }
