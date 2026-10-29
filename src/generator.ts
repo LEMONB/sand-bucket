@@ -3,7 +3,7 @@ import { catalogArtwork, artworkIndex, artworkPalette } from './art-catalog.ts';
 import { arrangeMechanics, mechanicsFor } from './level-mechanics.ts';
 import type { Mechanics } from './mechanics.ts';
 
-export const GENERATOR_VERSION = 3;
+export const GENERATOR_VERSION = 5;
 export const MAX_STEPS = 30_000;
 export const MAX_ATTEMPTS = 24;
 export interface Move { tick: number; bucketId: number }
@@ -155,7 +155,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
     field[position] = specs[id]; occupancy[position] = null;
   }
   let mechanics:Mechanics|undefined;
-  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds));
+  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds,random));
   const level: Level = { cells, field, columns, walls: [...walls], mechanics,palette };
   // Choose the starting face so the alternating bucket has its required color on the certified turn.
   const alternate=field.find(b=>b?.alternate);

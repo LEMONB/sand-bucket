@@ -46,3 +46,18 @@
 .sparkles { display: none; position: absolute; top: -8px; left: -8px; width: 66px; text-align: center; color: #d0ac48; font-size: 20px; }
 .completion .sparkles { display: block; }
 .sand-stream { position: fixed; z-index: 4; pointer-events: none; }
+
+/* Short fill response follows incoming grains without delaying the game state. */
+.mock-fill { transition: height 90ms linear; }
+.slot-bucket { transform-origin: 50% 90%; }
+.completion-fill { display: none; position: absolute; bottom: 8px; left: 13px; width: 22px; height: 24px; border-radius: 3px; background: #fff2c7bb; }
+.completion .completion-fill { display: block; }
+@media(prefers-reduced-motion: reduce) { .mock-fill { transition: none; } }
+
+.overlay:not([hidden]) .result { animation: result-enter 300ms cubic-bezier(.22,.7,.25,1); }
+@keyframes result-enter { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@media(prefers-reduced-motion: reduce) { .overlay:not([hidden]) .result { animation: none; } }
+
+.overlay.is-win:not([hidden]) .result-icon { animation: victory-accent 600ms cubic-bezier(.22,.7,.25,1); }
+@keyframes victory-accent { 0% { transform: scale(.5) rotate(-20deg); opacity: 0; } 60% { transform: scale(1.18) rotate(6deg); opacity: 1; } 100% { transform: none; } }
+@media(prefers-reduced-motion: reduce) { .overlay.is-win:not([hidden]) .result-icon { animation: none; } }

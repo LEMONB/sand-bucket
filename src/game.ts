@@ -4,7 +4,7 @@ export const FIELD_COLUMNS = 4;
 export const BELT_LIMIT = 5;
 export const LOOP_TICKS = 360;
 export const COLLECTION_DEPTH = 5;
-export const LAUNCH_TICKS = 18;
+export const LAUNCH_TICKS = 36;
 export const PALETTE = ['#000000', '#51b8ad', '#ed846e', '#f4cf73', '#b8acd6'];
 export const COLOR_NAMES = ['', 'Мятное', 'Коралловое', 'Золотое', 'Сиреневое'];
 
@@ -41,6 +41,7 @@ export interface GameEvent {
   path?: number[];
   from?: { x: number; y: number };
   amount?: number;
+  partnerId?: number;
 }
 
 export function exitPaths(field: readonly (BucketSpec | null)[], columns = FIELD_COLUMNS, walls: ReadonlySet<number> = new Set()): Map<number, number[]> {
@@ -92,7 +93,6 @@ export class Game {
   tick = 0;
   status: Status = 'playing';
   revision = 0;
-  private quietTicks = 0;
 
   constructor(level: Level) {
     this.columns = level.columns ?? FIELD_COLUMNS;
@@ -239,14 +239,13 @@ export class Game {
     for(const position of indexes) {
       const free=this.slots.indexOf(null);
       this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.tick+LAUNCH_TICKS};
-      this.events.push({type:'launch',tick:this.tick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!});
+      this.events.push({type:'launch',tick:this.tick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!,partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
       this.field[position]=null;
     }
     this.turns++;
     const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.bridges.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.alternate));
     if(changes) { this.pendingField=true; this.busyUntil=this.tick+LAUNCH_TICKS+10; }
     this.refreshField();
-    this.quietTicks = 0;
     return 'ok';
   }
 
@@ -311,17 +310,22 @@ export class Game {
       }
       this.settled = !moved;
     }
-    if (changed) {
-      this.revision++;
-      this.quietTicks = 0;
-    } else {
-      this.quietTicks++;
-    }
+    if (changed) this.revision++;
     if (this.collected === this.total) {
       this.status = 'won';
-    } else if (this.quietTicks >= LOOP_TICKS &&
-        (this.slots.every(Boolean) || this.paths.size === 0) && !this.pendingField && !this.slots.some(b => b && b.arrivalTick > this.tick)) {
-      this.status = 'lost';
+    } else if (this.settled && !this.pendingField && !this.slots.some(b=>b&&b.arrivalTick>this.tick)) {
+      const free=this.slots.filter(b=>!b).length;
+      const canLaunch=free>0&&[...this.paths.keys()].some(i=>{
+        const pair=this.mechanics.links.find(p=>p.includes(this.field[i]!.id));
+        return !pair||free===1||pair.every(id=>this.paths.has(this.field.findIndex(b=>b?.id===id)));
+      });
+      if(!canLaunch){
+        const colors=new Set(this.slots.filter(b=>b).map(b=>b!.color));
+        let canCollect=false;
+        for(let i=(HEIGHT-COLLECTION_DEPTH)*WIDTH;i<this.cells.length&&!canCollect;i++)
+          canCollect=!this.held[i]&&colors.has(this.cells[i]);
+        if(!canCollect)this.status='lost';
+      }
     }
   }
 }

@@ -74,6 +74,7 @@ function reset():void {
   el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
+  el('overlay').classList.toggle('is-win',game.status==='won');
   el('result-title').textContent=title;el('result-copy').textContent=copy;el('result-action').textContent=action;
   el<HTMLButtonElement>('result-action').onclick=callback;el('overlay').hidden=false;el('result-action').focus();
 }
@@ -95,7 +96,7 @@ async function start():Promise<void> {
         accumulator=advanceFrame(game,ticker.deltaMS/1000,speed,accumulator);
         sand.draw(game);belt.draw(game,dt);updateField();el('field').classList.toggle('is-changing',game.tick<game.busyUntil);hud();
         if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;if(devLevel)devLevel++;else if(!lossScenario)progress.advance();menu();}
-        if(game.status!=='playing'&&!finished&&!belt.busy){
+        if(game.status!=='playing'&&!finished&&(game.status==='lost'||!belt.busy)){
           finished=true;sand.app.ticker.stop();
           if(game.status==='won')dialog('До последней песчинки.','Следующий узор уже ждёт.','Следующий',()=>void start());
           else dialog('Цвета разминулись.','Освободи путь к нужным цветам и попробуй другой порядок.','Попробовать снова',reset);
@@ -107,7 +108,7 @@ async function start():Promise<void> {
     }
     visible=true;el('menu').hidden=true;el('game').hidden=false;root.classList.add('playing');reset();el('restart').focus();
     el('sand').setAttribute('aria-label',ART_TITLES[record.art??0]);
-    if((record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics();
+    if(!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics();
     void loader.get((devLevel||progress.data.number)+1);
   } catch(error){
     console.error(error);el('offline-note').textContent='Не удалось запустить игру. Обнови страницу.';
