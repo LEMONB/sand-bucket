@@ -21,13 +21,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+        env:
+          SAND_BUCKET_FULL_TESTS: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     permissions:

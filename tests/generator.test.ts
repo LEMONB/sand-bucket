@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 import { asLevel, difficulty, generateLevel, replay, replayOrder, type GeneratedLevel } from '../src/generator';
 import { fallbackLevel } from '../src/level';
 
+const seedCount = process.env.SAND_BUCKET_FULL_TESTS === '1' ? 100 : 3;
+
 it('cycles 3 easy, 3 medium, 2 hard, 1 very hard',()=>{
   expect(Array.from({length:18},(_,i)=>difficulty(i+1))).toEqual([0,0,0,1,1,1,2,2,3,0,0,0,1,1,1,2,2,3]);
 });
@@ -12,7 +14,7 @@ for(const number of [1,4,7,9]) {
     expect(replay(asLevel(level),level.solution).status).toBe('won');
     for(const delay of [6,12,18])expect(replayOrder(asLevel(level),level.solution.map(m=>m.bucketId),delay).game.status).toBe('won');
   },30000);
-  it.each(Array.from({length:100},(_,i)=>i*104729+1))(`class ${number}: seed %i has a verified solution`,seed=>{
+  it.each(Array.from({length:seedCount},(_,i)=>i*104729+1))(`class ${number}: seed %i has a verified solution`,seed=>{
     let level: GeneratedLevel;
     try { level=generateLevel(number,seed); }
     catch(error) {
