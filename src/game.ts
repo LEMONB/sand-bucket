@@ -1,10 +1,10 @@
 export const WIDTH = 128;
-export const HEIGHT = 112;
+export const HEIGHT = 128;
 export const FIELD_COLUMNS = 4;
-export const FIELD_SIZE = 16;
 export const BELT_LIMIT = 5;
 export const LOOP_TICKS = 360;
 export const COLLECTION_DEPTH = 5;
+export const LAUNCH_TICKS = 18;
 export const PALETTE = ['#000000', '#51b8ad', '#ed846e', '#f4cf73', '#b8acd6'];
 export const COLOR_NAMES = ['', 'Мятное', 'Коралловое', 'Золотое', 'Сиреневое'];
 
@@ -17,41 +17,61 @@ export interface BucketSpec {
 export interface Level {
   cells: Uint8Array;
   field: (BucketSpec | null)[];
+  columns?: number;
+  walls?: number[];
 }
 
 export interface Bucket extends BucketSpec {
   filled: number;
+  arrivalTick: number;
 }
 
 export type Status = 'playing' | 'won' | 'lost';
 export type LaunchResult = 'ok' | 'full' | 'blocked' | 'empty' | 'finished';
 export type Speed = 1 | 2;
 
-/** Flood the empty cells from the top edge; occupied frontier cells can exit. */
-export function accessibleCells(field: readonly (BucketSpec | null)[]): Set<number> {
-  const accessible = new Set<number>();
-  const visited = new Set<number>();
-  const pending = [0, 1, 2, 3];
+export interface GameEvent {
+  type: 'launch' | 'arrive' | 'complete';
+  tick: number;
+  slot: number;
+  bucket: Bucket;
+  path?: number[];
+}
+
+export function exitPaths(field: readonly (BucketSpec | null)[], columns = FIELD_COLUMNS, walls: ReadonlySet<number> = new Set()): Map<number, number[]> {
+  const paths = new Map<number, number[]>();
+  const parents = new Int16Array(field.length).fill(-2);
+  const pending: number[] = [];
+  for (let i = 0; i < columns; i++) { pending.push(i); parents[i] = -1; }
   for (let cursor = 0; cursor < pending.length; cursor++) {
     const index = pending[cursor];
-    if (visited.has(index)) {
-      continue;
-    }
-    visited.add(index);
+    if (walls.has(index)) continue;
     if (field[index]) {
-      accessible.add(index);
+      const path = [index];
+      while (parents[path[path.length - 1]] !== -1) path.push(parents[path[path.length - 1]]);
+      paths.set(index, path);
       continue;
     }
-    const x = index % FIELD_COLUMNS;
-    if (index >= FIELD_COLUMNS) pending.push(index - FIELD_COLUMNS);
-    if (index + FIELD_COLUMNS < FIELD_SIZE) pending.push(index + FIELD_COLUMNS);
-    if (x > 0) pending.push(index - 1);
-    if (x < FIELD_COLUMNS - 1) pending.push(index + 1);
+    const x = index % columns;
+    for (const next of [index - columns, index + columns, x > 0 ? index - 1 : -1, x < columns - 1 ? index + 1 : -1]) {
+      if (next >= 0 && next < field.length && parents[next] === -2) {
+        parents[next] = index; pending.push(next);
+      }
+    }
   }
-  return accessible;
+  return paths;
+}
+
+export function accessibleCells(field: readonly (BucketSpec | null)[], columns = FIELD_COLUMNS, walls: ReadonlySet<number> = new Set()): Set<number> {
+  return new Set(exitPaths(field, columns, walls).keys());
 }
 
 export class Game {
+  readonly columns: number;
+  readonly walls: ReadonlySet<number>;
+  readonly events: GameEvent[] = [];
+  paths: Map<number, number[]>;
+  private settled = false;
   readonly cells: Uint8Array;
   readonly field: (BucketSpec | null)[];
   readonly slots: (Bucket | null)[] = Array(BELT_LIMIT).fill(null);
@@ -63,8 +83,14 @@ export class Game {
   private quietTicks = 0;
 
   constructor(level: Level) {
-    if (level.cells.length !== WIDTH * HEIGHT || level.field.length !== FIELD_SIZE) {
+    this.columns = level.columns ?? FIELD_COLUMNS;
+    this.walls = new Set(level.walls ?? []);
+    if (!Number.isInteger(this.columns) || this.columns < 4 || this.columns > 7 ||
+        level.cells.length !== WIDTH * HEIGHT || level.field.length !== this.columns ** 2) {
       throw new Error('Неверный размер уровня');
+    }
+    if ([...this.walls].some(i => !Number.isInteger(i) || i < 0 || i >= level.field.length || level.field[i] !== null)) {
+      throw new Error('Неверные стены уровня');
     }
     const sand = [0, 0, 0, 0, 0];
     const space = [0, 0, 0, 0, 0];
@@ -90,6 +116,7 @@ export class Game {
     }
     this.cells = level.cells.slice();
     this.field = level.field.map((bucket) => bucket ? { ...bucket } : null);
+    this.paths = exitPaths(this.field, this.columns, this.walls);
     this.total = sand.slice(1).reduce((a, b) => a + b, 0);
     if (!this.total) this.status = 'won';
   }
@@ -107,11 +134,13 @@ export class Game {
     if (this.status !== 'playing') return 'finished';
     const index = this.field.findIndex((bucket) => bucket?.id === bucketId);
     if (index < 0) return 'empty';
-    if (!accessibleCells(this.field).has(index)) return 'blocked';
+    if (!this.paths.has(index)) return 'blocked';
     const slot = this.slots.indexOf(null);
     if (slot < 0) return 'full';
-    this.slots[slot] = { ...this.field[index]!, filled: 0 };
+    this.slots[slot] = { ...this.field[index]!, filled: 0, arrivalTick: this.tick + LAUNCH_TICKS };
+    this.events.push({ type: 'launch', tick: this.tick, slot, bucket: { ...this.slots[slot] }, path: this.paths.get(index)! });
     this.field[index] = null;
+    this.paths = exitPaths(this.field, this.columns, this.walls);
     this.quietTicks = 0;
     return 'ok';
   }
@@ -122,7 +151,8 @@ export class Game {
     let changed = false;
     for (let slot = 0; slot < BELT_LIMIT; slot++) {
       const bucket = this.slots[slot];
-      if (!bucket) continue;
+      if (!bucket || this.tick < bucket.arrivalTick) continue;
+      if (this.tick === bucket.arrivalTick) this.events.push({ type: 'arrive', tick: this.tick, slot, bucket: { ...bucket } });
       const center = Math.floor(this.slotPosition(slot) * WIDTH);
       for (let y = HEIGHT - 1; y >= HEIGHT - COLLECTION_DEPTH && bucket.filled < bucket.capacity; y--) {
         for (let x = Math.max(0, center - 7); x <= Math.min(WIDTH - 1, center + 7) && bucket.filled < bucket.capacity; x++) {
@@ -135,30 +165,39 @@ export class Game {
           }
         }
       }
-      if (bucket.filled === bucket.capacity) this.slots[slot] = null;
+      if (bucket.filled === bucket.capacity) {
+        this.events.push({ type: 'complete', tick: this.tick, slot, bucket: { ...bucket } });
+        this.slots[slot] = null;
+      }
     }
 
-    // Bottom-up traversal lets each grain move at most one row per simulation tick.
-    for (let y = HEIGHT - 2; y >= 0; y--) {
-      for (let i = 0; i < WIDTH; i++) {
-        const x = this.tick % 2 ? i : WIDTH - 1 - i;
-        const index = y * WIDTH + x;
-        if (this.cells[index] === 0) continue;
-        let target = index + WIDTH;
-        if (this.cells[target] !== 0) {
-          const direction = (x + this.tick) % 2 ? 1 : -1;
-          if (x + direction >= 0 && x + direction < WIDTH && this.cells[target + direction] === 0) {
-            target += direction;
-          } else if (x - direction >= 0 && x - direction < WIDTH && this.cells[target - direction] === 0) {
-            target -= direction;
-          } else {
-            continue;
+    const collected = changed;
+    let moved = false;
+    if (!this.settled || collected) {
+      // Bottom-up traversal lets each grain move at most one row per simulation tick.
+      for (let y = HEIGHT - 2; y >= 0; y--) {
+        for (let i = 0; i < WIDTH; i++) {
+          const x = this.tick % 2 ? i : WIDTH - 1 - i;
+          const index = y * WIDTH + x;
+          if (this.cells[index] === 0) continue;
+          let target = index + WIDTH;
+          if (this.cells[target] !== 0) {
+            const direction = (x + this.tick) % 2 ? 1 : -1;
+            if (x + direction >= 0 && x + direction < WIDTH && this.cells[target + direction] === 0) {
+              target += direction;
+            } else if (x - direction >= 0 && x - direction < WIDTH && this.cells[target - direction] === 0) {
+              target -= direction;
+            } else {
+              continue;
+            }
           }
+          this.cells[target] = this.cells[index];
+          this.cells[index] = 0;
+          changed = true;
+          moved = true;
         }
-        this.cells[target] = this.cells[index];
-        this.cells[index] = 0;
-        changed = true;
       }
+      this.settled = !moved;
     }
     if (changed) {
       this.revision++;
@@ -169,7 +208,7 @@ export class Game {
     if (this.collected === this.total) {
       this.status = 'won';
     } else if (this.quietTicks >= LOOP_TICKS &&
-        (this.slots.every(Boolean) || accessibleCells(this.field).size === 0)) {
+        (this.slots.every(Boolean) || this.paths.size === 0) && !this.slots.some(b => b && b.arrivalTick > this.tick)) {
       this.status = 'lost';
     }
   }

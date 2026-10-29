@@ -1,0 +1,85 @@
+import { bucketIcon } from './bucket-icon';
+import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, PALETTE, type Game, type GameEvent } from './game';
+
+export class BeltView {
+  private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number }[][] = [];
+  private readonly effects: { element: HTMLElement; active: boolean; event?: GameEvent; started: number }[] = [];
+  private clock = 0;
+  private beltRect!: DOMRect;
+  private cells: {x:number;y:number}[] = [];
+  private grainSize = 32;
+  private reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  constructor(private belt: HTMLElement, private field: HTMLElement) {
+    for(let slot=0;slot<BELT_LIMIT;slot++) {
+      const views=[];
+      for(let fragment=0;fragment<2;fragment++) {
+        const element=document.createElement('div');element.className='mock-slot';element.setAttribute('aria-hidden','true');
+        element.innerHTML=`<div class="slot-bucket">${bucketIcon}<i class="mock-fill"></i><small></small></div>`;
+        belt.append(element);
+        views.push({slot:element,bucket:element.firstElementChild as HTMLElement,fill:element.querySelector('i')!,label:element.querySelector('small')!,id:-1,percent:-1});
+      }
+      this.views.push(views);
+    }
+    // At most five launches plus recent completions; reuse a bounded visual pool.
+    for(let i=0;i<20;i++) {
+      const element=document.createElement('div');element.className='flying-bucket';element.hidden=true;element.setAttribute('aria-hidden','true');
+      element.innerHTML=`${bucketIcon}<span class="sparkles">✦ · ✧</span>`;document.body.append(element);
+      this.effects.push({element,active:false,started:0});
+    }
+  }
+  measure(): void {
+    this.beltRect=this.belt.getBoundingClientRect();
+    this.cells=[...this.field.children].map(element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
+    const shape=this.field.querySelector('.bucket-shape');
+    if(shape)this.grainSize=shape.getBoundingClientRect().width;
+  }
+  reset(): void { for(const effect of this.effects){effect.active=false;effect.element.hidden=true;} }
+  get busy(): boolean {return this.effects.some(e=>e.active);}
+  draw(game: Game, seconds: number): void {
+    this.clock+=seconds;
+    for(const event of game.events) {
+      if(event.type==='arrive')continue;
+      const effect=this.effects.find(e=>!e.active);
+      if(!effect)continue;
+      effect.active=true;effect.event=event;effect.started=this.clock;effect.element.hidden=false;
+      effect.element.style.color=PALETTE[event.bucket.color];
+      effect.element.classList.toggle('completion',event.type==='complete');
+      effect.element.style.width=`${event.type==='complete'?48:this.grainSize}px`;
+    }
+    game.events.length=0;
+    for(let slot=0;slot<BELT_LIMIT;slot++) {
+      const position=game.slotPosition(slot),bucket=game.slots[slot];
+      const visible=bucket!==null&&game.tick>=bucket.arrivalTick;
+      const percent=bucket?Math.floor(bucket.filled/bucket.capacity*100):0;
+      for(let fragment=0;fragment<2;fragment++) {
+        const view=this.views[slot][fragment];
+        const x=(fragment===0?position:position+(position<.5?1:-1))*this.beltRect.width;
+        view.slot.style.transform=`translateX(${x-27}px)`;
+        view.bucket.hidden=!visible;
+        if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=PALETTE[bucket.color];}
+        if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
+      }
+    }
+    for(const effect of this.effects) {
+      if(!effect.active)continue;
+      const event=effect.event!,complete=event.type==='complete';
+      const t=complete?Math.min((this.clock-effect.started)/.28,1):Math.min((game.tick-event.tick)/LAUNCH_TICKS,1);
+      const end={x:this.beltRect.left+game.slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34};
+      let x=end.x,y=end.y,scale=1,opacity=1;
+      if(complete){
+        x=this.beltRect.left+(((event.tick%LOOP_TICKS)/LOOP_TICKS+event.slot/BELT_LIMIT)%1)*this.beltRect.width;
+        y-=Math.sin(t*Math.PI/2)*20;scale=1+Math.sin(t*Math.PI)*.2;opacity=1-t;
+      }else{
+        const path=event.path!;
+        const segment=t*(path.length+1),index=Math.min(Math.floor(segment),path.length),f=segment-index;
+        const mouth={x:this.cells[path[path.length-1]].x,y:this.beltRect.bottom+4};
+        const from=index<path.length?this.cells[path[index]]:mouth;
+        const to=index+1<path.length?this.cells[path[index+1]]:index<path.length?mouth:end;
+        x=from.x+(to.x-from.x)*f;y=from.y+(to.y-from.y)*f;
+      }
+      effect.element.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) scale(${this.reduced.matches?1:scale})`;
+      effect.element.style.opacity=String(this.reduced.matches?(complete?opacity:0):opacity);
+      if(t>=1){effect.active=false;effect.element.hidden=true;}
+    }
+  }
+}
