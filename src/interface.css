@@ -13,8 +13,8 @@
 #demo-speed { width: 44px; height: 44px; padding: 8px; border: 0; background: transparent; color: #446353; flex-shrink: 0; }
 #demo-speed span { display: grid; place-items: center; height: 26px; border-radius: 8px; background: #e4e9db; font-size: 11px; font-weight: 700; }
 #demo-speed[aria-pressed=true] span { background: #315c4d; color: #fffbed; }
-.belt-row { position: relative; flex-shrink: 0; }
-.belt-row #demo-speed { position: absolute; left: 50%; top: -30px; transform: translateX(-50%); width: 68px; padding: 10px 4px; display: grid; place-items: center; z-index: 5; }
+.belt-row { position: relative; flex-shrink: 0; padding-bottom: 44px; }
+.belt-row #demo-speed { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 68px; padding: 10px 4px; display: grid; place-items: center; z-index: 5; }
 .belt-row #demo-speed span { width: 44px; height: 10px; min-height: 0; font-size: 9px; line-height: 10px; border-radius: 999px; box-shadow: inset 0 1px 0 #ffffff26; background: linear-gradient(#3c6a59, #315c4d); color: #fffbed; }
 #app.playing .mock-sand { margin-bottom: 16px; }
 .mock-sand { position: relative; min-height: 0; width: min(100%, calc(100svh - 426px - env(safe-area-inset-bottom))); aspect-ratio: 1; flex: 0 0 auto; align-self: center; margin: 5px 0 8px; }

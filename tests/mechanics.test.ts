@@ -90,3 +90,37 @@ it('rejects intersecting regions, missing keys and duplicate bucket IDs',()=>{
   expect(()=>new Game(level)).toThrow();
   const missing=fixture({0:bucket(0)},l=>{l.mechanics!.gates=[{cells:[4],key:99}];});expect(()=>new Game(missing)).toThrow();
 });
+
+it('pulls an inaccessible linked partner along the selected bucket path', () => {
+  const level = fixture({0:bucket(0),4:bucket(1)}, l => {
+    l.walls = [1,2,3,5,6,7,8,9,10,11,12,13,14,15];
+    l.mechanics!.links = [[0,1]];
+  });
+  const game = new Game(level);
+  expect(game.paths.has(4)).toBe(false);
+  expect(game.launch(1)).toBe('blocked');
+  expect(game.launch(0)).toBe('ok');
+  expect(game.buckets.map(b => b.id)).toEqual([0,1]);
+  expect(game.events.map(e => e.path)).toEqual([[0],[4,0]]);
+  expect(game.events.map(e => e.partnerId)).toEqual([1,0]);
+  expect(game.turns).toBe(1);
+  expect(game.mechanics.links).toHaveLength(0);
+
+  const single = new Game(level);
+  for (let i=0;i<4;i++) single.slots[i]={...bucket(10+i),filled:0,arrivalTick:LAUNCH_TICKS};
+  expect(single.launch(0)).toBe('ok');
+  expect(single.field[4]?.id).toBe(1);
+  expect(single.mechanics.links).toHaveLength(0);
+  expect(single.launch(1)).toBe('full');
+});
+
+it('does not declare loss when only one member of a linked pair is accessible', () => {
+  const level = fixture({0:bucket(0),4:bucket(1)}, l => {
+    l.walls = [1,2,3,5,6,7,8,9,10,11,12,13,14,15];
+    l.mechanics!.links = [[0,1]];
+  });
+  const game = new Game(level);
+  for (let i=0;i<1000;i++) game.step();
+  expect(game.status).toBe('playing');
+  expect(game.launch(0)).toBe('ok');
+});

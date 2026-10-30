@@ -74,7 +74,7 @@ export function solve(level: Level, delay = 0, speed:Speed=2): {game:Game;soluti
       const pair=game.mechanics.links.find(p=>p.includes(b.id));
       if(pair&&game.slots.filter(s=>!s).length>=2){
         const other=game.field.find(o=>o?.id===pair.find(id=>id!==b.id));
-        if(other&&(!game.paths.has(game.field.indexOf(other))||!exposed[other.color]||game.slots.some(s=>s?.color===other.color)))return false;
+        if(other&&(!exposed[other.color]||game.slots.some(s=>s?.color===other.color)))return false;
       }
       return true;
     });

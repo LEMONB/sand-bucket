@@ -13,7 +13,7 @@ import { GameRenderer, paintSand } from './renderer';
 import { BeltView } from './belt-view';
 import { ProgressStore } from './progress';
 import { LevelLoader } from './level-loader';
-import { createLossScenario } from './dev-scenarios';
+import { createLossScenario, createPuzzleScenario, PUZZLE_TITLES, type PuzzleScenario } from './dev-scenarios';
 
 let storage: Pick<Storage,'getItem'|'setItem'>;
 try { storage=localStorage; } catch { storage={getItem(){throw Error();},setItem(){throw Error();}}; }
@@ -31,6 +31,8 @@ root.innerHTML=`<section id="menu" class="menu" aria-label="Главное ме�
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
+const requestedScenario=import.meta.env.DEV?new URLSearchParams(location.search).get('scenario'):null;
+const puzzleScenario=requestedScenario&&Object.hasOwn(PUZZLE_TITLES,requestedScenario)?requestedScenario as PuzzleScenario:null;
 const lossScenario=import.meta.env.DEV&&new URLSearchParams(location.search).get('scenario')==='loss';
 const requestedLevel=import.meta.env.DEV?Number(new URLSearchParams(location.search).get('level')):0;
 let devLevel=Number.isSafeInteger(requestedLevel)&&requestedLevel>0?requestedLevel:0;
@@ -50,13 +52,14 @@ function menu():void {
   storageNote();
 }
 function setSpeed(value:Speed):void {
-  speed=value;progress.setSpeed(value);
+  speed=value;if(!puzzleScenario)progress.setSpeed(value);
   const button=el('demo-speed');button.firstElementChild!.textContent=`×${value}`;button.setAttribute('aria-pressed',String(value===2));
   button.setAttribute('aria-label',value===1?'Ускорить в два раза':'Вернуть обычную скорость');storageNote();
 }
 function updateField():void { fieldView.draw(game); }
 function buildField():void { fieldView.reset(game); }
 function explainMechanics(onlyNew=false):void {
+  if(puzzleScenario)return;
   const kinds=[...new Set(record.kinds??[])].filter(k=>!onlyNew||!shownMechanics.has(k));
   if(!kinds.length)return;
   paused=true;sand.app.ticker.stop();
@@ -69,9 +72,9 @@ function hud():void {
   if(count!==lastCount){lastCount=count;el('count').textContent=`${count} / 5`;}
 }
 function reset():void {
-  game=new Game(lossScenario?createLossScenario():asLevel(record));accumulator=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
+  game=new Game(puzzleScenario?createPuzzleScenario(puzzleScenario):lossScenario?createLossScenario():asLevel(record));accumulator=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
   root.style.setProperty('--columns',String(game.columns));el('overlay').hidden=true;
-  el('level-number').textContent=`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=lossScenario?'Проверка проигрыша':DIFFICULTIES[difficulty(record.number)];
+  el('level-number').textContent=puzzleScenario?PUZZLE_TITLES[puzzleScenario]:`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=puzzleScenario?'Образец':lossScenario?'Проверка проигрыша':DIFFICULTIES[difficulty(record.number)];
   el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0,speed);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
@@ -88,7 +91,7 @@ async function start():Promise<void> {
   if(loading)return;loading=true;const play=el<HTMLButtonElement>('play');play.disabled=true;play.textContent='Готовим песок…';
   el<HTMLButtonElement>('result-action').disabled=true;
   try {
-    record=await loader.get(devLevel||progress.data.number);
+    if(!puzzleScenario)record=await loader.get(devLevel||progress.data.number);
     if(!initialized){
       await sand.init(el('sand'));initialized=true;
       sand.app.ticker.add(ticker=>{
@@ -96,10 +99,11 @@ async function start():Promise<void> {
         const dt=Math.min(ticker.deltaMS/1000,.1);
         accumulator=advanceFrame(game,ticker.deltaMS/1000,speed,accumulator);
         sand.draw(game);belt.draw(game,dt,speed);updateField();el('field').classList.toggle('is-changing',game.motionTick<game.busyUntil);hud();
-        if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;if(devLevel)devLevel++;else if(!lossScenario)progress.advance();menu();}
+        if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;if(!puzzleScenario&&devLevel)devLevel++;else if(!puzzleScenario&&!lossScenario)progress.advance();menu();}
         if(game.status!=='playing'&&!finished&&(game.status==='lost'||!belt.busy)){
           finished=true;sand.app.ticker.stop();
-          if(game.status==='won')dialog('До последней песчинки.','Следующий узор уже ждёт.','Следующий',()=>void start());
+          if(game.status==='won'&&puzzleScenario)dialog('До последней песчинки.',PUZZLE_TITLES[puzzleScenario],'Повторить',reset);
+          else if(game.status==='won')dialog('До последней песчинки.','Следующий узор уже ждёт.','Следующий',()=>void start());
           else dialog('Цвета разминулись.','Освободи путь к нужным цветам и попробуй другой порядок.','Попробовать снова',reset);
         }
       });
@@ -108,9 +112,9 @@ async function start():Promise<void> {
       });
     }
     visible=true;el('menu').hidden=true;el('game').hidden=false;root.classList.add('playing');reset();el('restart').focus();
-    el('sand').setAttribute('aria-label',ART_TITLES[record.art??0]);
-    if(!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics(true);
-    void loader.get((devLevel||progress.data.number)+1);
+    el('sand').setAttribute('aria-label',puzzleScenario?PUZZLE_TITLES[puzzleScenario]:ART_TITLES[record.art??0]);
+    if(!puzzleScenario&&!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics(true);
+    if(!puzzleScenario)void loader.get((devLevel||progress.data.number)+1);
   } catch(error){
     console.error(error);el('offline-note').textContent='Не удалось запустить игру. Обнови страницу.';
   } finally {loading=false;play.disabled=false;play.textContent='Играть →';el<HTMLButtonElement>('result-action').disabled=false;}
@@ -140,7 +144,7 @@ document.addEventListener('keydown',event=>{
   }
 });
 setSpeed(speed);menu();
-if(lossScenario||devLevel)void start();
+if(puzzleScenario||lossScenario||devLevel)void start();
 if(import.meta.env.PROD&&'serviceWorker'in navigator){
   window.addEventListener('load',()=>{
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{scope:import.meta.env.BASE_URL}).then(async registration=>{

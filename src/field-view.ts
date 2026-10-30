@@ -45,10 +45,7 @@ export class FieldView {
     const nextPositions=new Map<number,number>();
     for(const [i,button] of this.buttons.entries()){
       const bucket=game.field[i];
-      const pair=bucket&&game.mechanics.links.find(p=>p.includes(bucket.id));
-      const partner=pair?.find(id=>id!==bucket!.id);
-      const partnerIndex=pair?game.field.findIndex(b=>b?.id===partner):-1;
-      const available=!!bucket&&game.paths.has(i)&&(!pair||freeSlots<2||game.paths.has(partnerIndex));
+      const available=!!bucket&&game.paths.has(i);
       button.className=`field-bucket ${blocked.has(i)?'mechanic-wall':!bucket?'is-empty':available?'is-available':'is-blocked'}`;
       button.classList.toggle('on-surface',surfaceCells.has(i));
       button.disabled=!available;

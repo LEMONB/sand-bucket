@@ -241,10 +241,9 @@ export class Game {
     if (slot < 0) return 'full';
     const pair=this.mechanics.links.find(p=>p.includes(bucketId));
     const partner=pair?.find(id=>id!==bucketId);
-    const partnerIndex=this.field.findIndex(b=>b?.id===partner);
+    const partnerIndex=pair?this.field.findIndex(b=>b?.id===partner):-1;
     const indexes=[index];
-    if(pair&&this.slots.filter(b=>!b).length>=2&&(partnerIndex<0||!this.paths.has(partnerIndex)))return 'blocked';
-    if(partnerIndex>=0&&this.paths.has(partnerIndex)&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
+    if(partnerIndex>=0&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
     if(pair)this.mechanics.links=this.mechanics.links.filter(p=>p!==pair);
     for(const position of indexes) {
       const departing=this.field[position]!;
@@ -254,7 +253,7 @@ export class Game {
       }
       const free=this.slots.indexOf(null);
       this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.motionTick+LAUNCH_TICKS};
-      this.events.push({type:'launch',tick:this.tick,motionTick:this.motionTick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!,partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
+      this.events.push({type:'launch',tick:this.tick,motionTick:this.motionTick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)??[position,...this.paths.get(index)!],partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
       this.field[position]=null;
     }
     this.turns++;
@@ -337,10 +336,7 @@ export class Game {
       this.status = 'won';
     } else if (this.settled && !this.pendingField && !this.slots.some(b=>b&&b.arrivalTick>this.motionTick)) {
       const free=this.slots.filter(b=>!b).length;
-      const canLaunch=free>0&&[...this.paths.keys()].some(i=>{
-        const pair=this.mechanics.links.find(p=>p.includes(this.field[i]!.id));
-        return !pair||free===1||pair.every(id=>this.paths.has(this.field.findIndex(b=>b?.id===id)));
-      });
+      const canLaunch=free>0&&this.paths.size>0;
       if(!canLaunch){
         const colors=new Set(this.slots.filter(b=>b).map(b=>b!.color));
         let canCollect=false;
