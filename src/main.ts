@@ -14,6 +14,7 @@ import { GameRenderer, paintSand } from './renderer';
 import { BeltView } from './belt-view';
 import { ProgressStore } from './progress';
 import { resultReady } from './result-timing';
+import { GameUpdates, readUpdateResume } from './updates';
 import { createLossScenario, createPuzzleScenario, PUZZLE_TITLES, PUZZLE_DESCRIPTIONS, type PuzzleScenario } from './dev-scenarios';
 
 let storage: Pick<Storage,'getItem'|'setItem'>;
@@ -37,7 +38,11 @@ const puzzleScenario=requestedScenario&&Object.hasOwn(PUZZLE_TITLES,requestedSce
 const lossScenario=import.meta.env.DEV&&new URLSearchParams(location.search).get('scenario')==='loss';
 const requestedLevel=import.meta.env.DEV?Number(new URLSearchParams(location.search).get('level')):0;
 let devLevel=Number.isSafeInteger(requestedLevel)&&requestedLevel>0&&requestedLevel<=CAMPAIGN_COUNT?requestedLevel:0;
-let selectedLevel=devLevel||progress.unlocked;
+const resumeURL=new URL(location.href);
+const resume=readUpdateResume(resumeURL,progress.unlocked);
+if(resume.attempted)history.replaceState(history.state,'',resumeURL.href);
+let updates:GameUpdates|undefined;
+let selectedLevel=devLevel||resume.destination?.level||progress.unlocked;
 let record:CampaignLevel=campaignLevel(selectedLevel);
 let game=new Game(playableLevel(record));
 let initialized=false,loading=false,visible=false,paused=false,finished=false,wonSaved=false;
@@ -84,6 +89,7 @@ function hud():void {
   if(count!==lastCount){lastCount=count;el('count').textContent=`${count} / 5`;}
 }
 function reset():void {
+  if(updates?.apply({level:record.number,play:true}))return;
   game=new Game(puzzleScenario?createPuzzleScenario(puzzleScenario):lossScenario?createLossScenario():playableLevel(record));accumulator=0;lossElapsed=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
   root.style.setProperty('--columns',String(game.columns));el('overlay').hidden=true;
   el('level-number').textContent=puzzleScenario?PUZZLE_TITLES[puzzleScenario]:`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=puzzleScenario?'Образец':lossScenario?'Проверка проигрыша':CAMPAIGN_DIFFICULTIES[campaignPhase(record.number)];
@@ -100,6 +106,7 @@ function pause():void {
   dialog('Небольшая пауза','Песок подождёт.','Продолжить',()=>{paused=false;el('overlay').hidden=true;accumulator=0;sand.app.ticker.start();el('restart').focus();});
 }
 async function start():Promise<void> {
+  if(updates?.apply({level:selectedLevel,play:true}))return;
   if(loading)return;loading=true;const play=el<HTMLButtonElement>('play');play.disabled=true;play.textContent='Готовим песок…';
   el<HTMLButtonElement>('result-action').disabled=true;
   try {
@@ -141,6 +148,7 @@ async function start():Promise<void> {
   } finally {loading=false;play.disabled=false;play.textContent=progress.completed?'Переиграть →':'Играть →';el<HTMLButtonElement>('result-action').disabled=false;}
 }
 function home():void {
+  if(updates?.apply({level:selectedLevel,play:false}))return;
   visible=false;paused=false;belt.reset();if(initialized)sand.app.ticker.stop();el('overlay').hidden=true;el('game').hidden=true;el('menu').hidden=false;root.classList.remove('playing');menu();el('play').focus();
 }
 el('field').addEventListener('click',event=>{
@@ -166,14 +174,10 @@ document.addEventListener('keydown',event=>{
   }
 });
 setSpeed(speed);menu();
-if(puzzleScenario||lossScenario||devLevel)void start();
-if(import.meta.env.PROD&&'serviceWorker'in navigator){
-  window.addEventListener('load',()=>{
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{scope:import.meta.env.BASE_URL}).then(async registration=>{
-      await navigator.serviceWorker.ready;if(progress.available)el('offline-note').textContent='Можно играть без интернета';
-      registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{
-        if(worker.state==='installed'&&navigator.serviceWorker.controller)el('offline-note').textContent='Есть обновление. Закрой все окна игры и открой снова.';
-      });});
-    }).catch(()=>{el('offline-note').textContent='Офлайн-загрузка недоступна. Пока играй с интернетом.';});
+if(import.meta.env.PROD){
+  updates=new GameUpdates(()=>!visible&&!loading?{level:selectedLevel,play:false}:null,resume.attempted,text=>{
+    if(progress.available)el('offline-note').textContent=text;
   });
+  void updates.start();
 }
+if(puzzleScenario||lossScenario||devLevel||resume.destination?.play)void start();
