@@ -9,19 +9,45 @@
 .bucket-extra { position: absolute; inset: 0; pointer-events: none; }
 .mechanic-wall .bucket-extra { display: grid; place-items: center; color: white; font-size: 22px; }
 .queue-colors { position: absolute; left: 12%; right: 12%; bottom: 0; display: flex; gap: 2px; }
-.queue-colors i { height: 5px; flex: 1; border: 1px solid #fff9; border-radius: 2px; }
 .bucket-extra small { position: absolute; right: 0; top: 0; font-size: 9px; color: #385b50; }
-.alternate-color { position: absolute; width: 11px; height: 11px; right: 3px; bottom: 2px; border-radius: 50%; border: 2px solid #fffaf2; }
-.pair-rope { position: absolute; z-index: 2; height: 5px; transform-origin: left center; pointer-events: none; border: 1px solid #647a70; border-radius: 3px; background: repeating-linear-gradient(90deg,#f5ecda 0 5px,#647a70 5px 7px); box-shadow: 0 1px 1px #fff8; }
 .sand-lid { position: absolute; z-index: 2; border: 2px solid #fff2c6; border-radius: 5px; background: #ffffff28; box-shadow: 0 2px 0 #203e5677; color: #fffaf2; display: flex; align-items: end; justify-content: end; padding: 3px; font-size: 20px; pointer-events: none; }
 .mock-field.is-changing { pointer-events: none; }
 #mechanic-help { background: transparent; border: 0; color: #506c60; font-size: 11px; padding: 4px; }
 .platform-next { position: absolute; bottom: 0; left: 10%; right: 10%; display: flex; gap: 2px; }
-.platform-next i { flex: 1; height: 5px; border: 1px solid #fffa; border-radius: 2px; }
 #mechanic-help { margin-left: auto; }
 .mock-field .on-surface.is-available { background: transparent; }
 .mock-field .on-surface.is-available:hover { background: #fff2; }
 
 .gate-surface { z-index: 2; border: 0; border-radius: 5px; color: #fffaf2; background: repeating-linear-gradient(90deg,#6a8176 0 6px,#b3bfb0 6px 10px); }
-.flying-rope { position: fixed; z-index: 29; }
 .sand-lid { transform-origin: 15% 0; }
+
+/* Extend into the grid gap only where another permanent wall continues. */
+.mock-field .solid-wall { background: none; border-radius: 0; }
+.solid-wall::before { content: ''; position: absolute; inset: 0; background: #82988b; border-radius: 5px; pointer-events: none; }
+.solid-wall.wall-up::before { border-top-left-radius: 0; border-top-right-radius: 0; }
+.solid-wall.wall-right::before { right: -2px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.solid-wall.wall-down::before { bottom: -2px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.solid-wall.wall-left::before { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.is-hidden .bucket-mark { transform: rotate(180deg); font-size: 16px; }
+
+.game-icon { width: 22px; height: 22px; display: block; flex: none; filter: drop-shadow(0 1px 1px #29453655); }
+.bucket-roles { position: absolute; top: 0; right: -2px; display: flex; flex-direction: column; gap: 1px; pointer-events: none; }
+.bucket-roles .game-icon { width: 18px; height: 18px; }
+.bucket-mark { top: 44%; display: grid; place-items: center; color: #38554b; }
+.bucket-shape .bucket-mark .game-icon { width: 20px; height: 20px; }
+.bucket-extra .queue-count { top: auto; bottom: 16px; right: 0; }
+.queue-colors, .platform-next { justify-content: center; gap: 1px; }
+.next-bucket { position: relative; display: block; width: 14px; height: 15px; flex: 0 1 14px; font-style: normal; }
+.next-bucket svg { display: block; width: 100%; height: 100%; }
+.next-bucket b { position: absolute; inset: 6px 0 0; text-align: center; font: bold 8px/9px system-ui; color: #38554b; }
+.platform-surface[data-upper="false"] { box-shadow: 0 3px 0 #947c63; }
+.gate-surface .game-icon, .sand-lid .game-icon { filter: drop-shadow(0 1px 0 #fff8) drop-shadow(0 -1px 0 #fff8); }
+.pair-yoke { position: absolute; z-index: 2; height: 32px; transform-origin: 0 19px; pointer-events: none; }
+.pair-yoke svg { display: block; width: 100%; height: 100%; overflow: visible; fill: none; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 1px #29453626); }
+.yoke-hook { stroke: #657b70; stroke-width: 2.5; }
+.yoke-wood { stroke: #ac8155; stroke-width: 8; }
+.yoke-highlight { stroke: #e4c296; stroke-width: 2; }
+.yoke-grain { stroke: #89613c; stroke-width: 1; opacity: .55; }
+.flying-yoke { position: fixed; z-index: 29; }
+.belt-marks .bucket-roles { right: -7px; top: 0; }
+.bucket-roles .swap-number { position: static; font: 8px/1 system-ui; text-align: center; color: #385b50; }

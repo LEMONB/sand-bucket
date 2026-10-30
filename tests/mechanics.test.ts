@@ -90,3 +90,63 @@ it('rejects intersecting regions, missing keys and duplicate bucket IDs',()=>{
   expect(()=>new Game(level)).toThrow();
   const missing=fixture({0:bucket(0)},l=>{l.mechanics!.gates=[{cells:[4],key:99}];});expect(()=>new Game(missing)).toThrow();
 });
+
+it('pulls an inaccessible linked partner along the selected bucket path', () => {
+  const level = fixture({0:bucket(0),4:bucket(1)}, l => {
+    l.walls = [1,2,3,5,6,7,8,9,10,11,12,13,14,15];
+    l.mechanics!.links = [[0,1]];
+  });
+  const game = new Game(level);
+  expect(game.paths.has(4)).toBe(false);
+  expect(game.launch(1)).toBe('blocked');
+  expect(game.launch(0)).toBe('ok');
+  expect(game.buckets.map(b => b.id)).toEqual([0,1]);
+  expect(game.events.map(e => e.path)).toEqual([[0],[4,0]]);
+  expect(game.events.map(e => e.partnerId)).toEqual([1,0]);
+  expect(game.turns).toBe(1);
+  expect(game.mechanics.links).toHaveLength(0);
+
+  const single = new Game(level);
+  for (let i=0;i<4;i++) single.slots[i]={...bucket(10+i),filled:0,arrivalTick:LAUNCH_TICKS};
+  expect(single.launch(0)).toBe('ok');
+  expect(single.field[4]?.id).toBe(1);
+  expect(single.mechanics.links).toHaveLength(0);
+  expect(single.launch(1)).toBe('full');
+});
+
+it('does not declare loss when only one member of a linked pair is accessible', () => {
+  const level = fixture({0:bucket(0),4:bucket(1)}, l => {
+    l.walls = [1,2,3,5,6,7,8,9,10,11,12,13,14,15];
+    l.mechanics!.links = [[0,1]];
+  });
+  const game = new Game(level);
+  for (let i=0;i<1000;i++) game.step();
+  expect(game.status).toBe('playing');
+  expect(game.launch(0)).toBe('ok');
+});
+
+it('reveals a mystery bucket when its path opens and remembers the reveal',()=>{
+  const level=fixture({0:bucket(0),4:{...bucket(1,2),hidden:true}},l=>{l.walls=[1,5,8];});
+  const game=new Game(level),mystery=game.field[4]!;
+  expect(game.isHidden(mystery)).toBe(true);
+  game.launch(0);expect(game.isHidden(mystery)).toBe(false);
+  game.walls.add(0);game.refreshField();expect(game.paths.has(4)).toBe(false);
+  expect(game.isHidden(mystery)).toBe(false);
+  expect(new Game(level).isHidden(mystery)).toBe(true);
+});
+it('does not change hidden colors or leak reveal state between clones and retries',()=>{
+  const level=fixture({0:bucket(0),4:{...bucket(1,2),hidden:true}},l=>{l.walls=[1,5,8];});
+  const original=new Game(level),copy=original.clone();copy.launch(0);
+  expect(original.isHidden(original.field[4]!)).toBe(true);
+  expect(copy.field[4]?.color).toBe(2);
+  expect(new Game(level).field[4]?.color).toBe(2);
+});
+it('retains mystery properties when hidden queue and platform layers appear',()=>{
+  const level=fixture({0:bucket(0),1:bucket(1)},l=>{
+    l.mechanics!.queues=[{cell:0,hidden:true,buckets:[{...bucket(2,2),hidden:true}]}];
+    l.mechanics!.platforms=[{cells:[1],hidden:true,next:[{...bucket(3,3),hidden:true}]}];
+  });
+  const game=new Game(level);game.launch(0);advance(game);game.launch(1);advance(game);
+  expect(game.field.slice(0,2).map(b=>b?.color)).toEqual([2,3]);
+  expect(game.field.slice(0,2).every(b=>b&&!game.isHidden(b))).toBe(true);
+});

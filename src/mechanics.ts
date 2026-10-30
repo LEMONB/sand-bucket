@@ -1,7 +1,7 @@
 import type { BucketSpec } from './game';
 
-export interface Queue { cell: number; buckets: BucketSpec[] }
-export interface Platform { cells: number[]; next: BucketSpec[] }
+export interface Queue { cell: number; buckets: BucketSpec[]; hidden?: boolean }
+export interface Platform { cells: number[]; next: BucketSpec[]; hidden?: boolean }
 export interface Bridge { cells: number[]; passage: number[] }
 export interface Gate { cells: number[]; key: number }
 export interface Lid { x: number; y: number; width: number; height: number; key: number }
@@ -17,14 +17,15 @@ export interface Mechanics {
 export function emptyMechanics(): Mechanics {
   return { queues: [], platforms: [], bridges: [], trays: [], gates: [], lids: [], links: [] };
 }
-export const MECHANIC_NAMES = ['Очередь', 'Ключ и замок', 'Платформа', 'Поднос', 'Мост', 'Связанные ведра', 'Крышка', 'Смена цвета'];
+export const MECHANIC_NAMES = ['Очередь', 'Ключ и замок', 'Платформа', 'Поднос', 'Мост', 'Связанные ведра', 'Крышка', 'Смена цвета', 'Скрытые цвета'];
 export const MECHANIC_HINTS = [
-  'В очереди до пяти ведер. Следующие цвета видны у основания.',
+  'В очереди до пяти ведер. Следующие ведра показаны у основания; знак ? скрывает цвет.',
   'Заполни ведро с ключом — откроется отмеченный проход.',
-  'Отправь все ведра с подноса, чтобы появился следующий слой.',
+  'Отправь все ведра с платформы, чтобы появился следующий слой. Его цвета могут быть скрыты знаком ?.',
   'После каждой отправки поднос поворачивается по часовой стрелке.',
   'Отправь все ведра с моста, чтобы открыть нижний проход.',
-  'Цепь соединяет пару. Если свободно одно место, уходит нажатое ведро и цепь разрывается.',
+  'Нажми доступное ведро пары — за ним уйдёт и закрытое. Если свободно одно место, уходит нажатое ведро и цепь разрывается.',
   'Заполни ведро с ромбом, чтобы освободить песок под крышкой.',
   'Два ведра с одинаковой меткой ⇄ обмениваются цветами после каждого хода. У них одинаковая вместимость. После отправки одного оба сохраняют текущие цвета.',
+  'Цвет ведра со знаком ? откроется, когда к нему появится свободный путь. В скрытых очередях и платформах цвета раскрываются при появлении вёдер. При повторе цвета те же.',
 ];

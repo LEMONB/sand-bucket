@@ -13,6 +13,7 @@ export interface BucketSpec {
   color: number;
   capacity: number;
   swapWith?: number;
+  hidden?: boolean;
 }
 
 export interface Level {
@@ -78,6 +79,7 @@ export class Game {
   readonly walls: Set<number>;
   readonly mechanics: Mechanics;
   readonly palette: string[];
+  readonly revealed = new Set<number>();
   readonly held = new Uint8Array(WIDTH * HEIGHT);
   fieldRevision = 0;
   turns = 0;
@@ -125,6 +127,7 @@ export class Game {
       if (!Number.isInteger(bucket.id) || bucket.id < 0 || ids.has(bucket.id) ||
           !Number.isInteger(bucket.color) || bucket.color < 1 || bucket.color >= PALETTE.length ||
           !Number.isInteger(bucket.capacity) || bucket.capacity <= 0 ||
+          (bucket.hidden !== undefined && typeof bucket.hidden !== 'boolean') ||
           (bucket.swapWith !== undefined && (!Number.isInteger(bucket.swapWith) || bucket.swapWith < 0 || bucket.swapWith === bucket.id))) {
         throw new Error('Неверные параметры ведра');
       }
@@ -155,10 +158,12 @@ export class Game {
       cells.forEach(i => used.add(i));
     };
     for (const q of this.mechanics.queues) {
+      if(q.hidden !== undefined && typeof q.hidden !== 'boolean')throw Error('Неверная видимость очереди');
       region([q.cell]);
       if (!this.field[q.cell] || q.buckets.length < 1 || q.buckets.length > 4) throw new Error('Неверная очередь');
     }
     for (const p of this.mechanics.platforms) {
+      if(p.hidden !== undefined && typeof p.hidden !== 'boolean')throw Error('Неверная видимость платформы');
       region(p.cells);
       if (p.cells.length !== p.next.length || p.cells.some(i => !this.field[i])) throw new Error('Неверная платформа');
     }
@@ -190,7 +195,16 @@ export class Game {
     this.mechanics.gates.forEach(g=>g.cells.forEach(i=>walls.add(i)));
     this.mechanics.bridges.forEach(b=>b.passage.forEach(i=>walls.add(i)));
     this.paths = exitPaths(this.field, this.columns, walls);
+    for(const index of this.paths.keys())this.revealed.add(this.field[index]!.id);
     this.fieldRevision++;
+  }
+
+  isHidden(bucket: BucketSpec): boolean {
+    return bucket.hidden === true && !this.revealed.has(bucket.id);
+  }
+
+  clone(): Game {
+    return Object.assign(Object.create(Game.prototype) as Game, structuredClone(this));
   }
 
   private finishFieldMove(): void {
@@ -241,10 +255,9 @@ export class Game {
     if (slot < 0) return 'full';
     const pair=this.mechanics.links.find(p=>p.includes(bucketId));
     const partner=pair?.find(id=>id!==bucketId);
-    const partnerIndex=this.field.findIndex(b=>b?.id===partner);
+    const partnerIndex=pair?this.field.findIndex(b=>b?.id===partner):-1;
     const indexes=[index];
-    if(pair&&this.slots.filter(b=>!b).length>=2&&(partnerIndex<0||!this.paths.has(partnerIndex)))return 'blocked';
-    if(partnerIndex>=0&&this.paths.has(partnerIndex)&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
+    if(partnerIndex>=0&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
     if(pair)this.mechanics.links=this.mechanics.links.filter(p=>p!==pair);
     for(const position of indexes) {
       const departing=this.field[position]!;
@@ -254,7 +267,7 @@ export class Game {
       }
       const free=this.slots.indexOf(null);
       this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.motionTick+LAUNCH_TICKS};
-      this.events.push({type:'launch',tick:this.tick,motionTick:this.motionTick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!,partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
+      this.events.push({type:'launch',tick:this.tick,motionTick:this.motionTick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)??[position,...this.paths.get(index)!],partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
       this.field[position]=null;
     }
     this.turns++;
@@ -337,10 +350,7 @@ export class Game {
       this.status = 'won';
     } else if (this.settled && !this.pendingField && !this.slots.some(b=>b&&b.arrivalTick>this.motionTick)) {
       const free=this.slots.filter(b=>!b).length;
-      const canLaunch=free>0&&[...this.paths.keys()].some(i=>{
-        const pair=this.mechanics.links.find(p=>p.includes(this.field[i]!.id));
-        return !pair||free===1||pair.every(id=>this.paths.has(this.field.findIndex(b=>b?.id===id)));
-      });
+      const canLaunch=free>0&&this.paths.size>0;
       if(!canLaunch){
         const colors=new Set(this.slots.filter(b=>b).map(b=>b!.color));
         let canCollect=false;
