@@ -89,6 +89,20 @@ it('waits for distant matching grains and for sand still falling',()=>{
     run(game,LOOP_TICKS+HEIGHT);expect(game.status).toBe('won');
   }
 });
+it('wakes settled rows when collection removes the supporting sand',()=>{
+  const cells=new Uint8Array(WIDTH*HEIGHT);
+  cells[64]=1;cells.fill(2,(HEIGHT-1)*WIDTH);
+  const field=Array<BucketSpec|null>(16).fill(null);
+  field[0]={id:0,color:2,capacity:WIDTH};field[1]={id:1,color:1,capacity:1};
+  const game=new Game({cells,field});run(game,HEIGHT*2);
+  expect(game.cells.slice((HEIGHT-2)*WIDTH,(HEIGHT-1)*WIDTH)).toContain(1);
+  game.launch(0);run(game,LOOP_TICKS+LAUNCH_TICKS+HEIGHT);
+  expect(game.collected).toBe(WIDTH);
+  expect(game.cells.slice(0,(HEIGHT-1)*WIDTH).some(Boolean)).toBe(false);
+  expect(game.cells.slice((HEIGHT-1)*WIDTH)).toContain(1);
+  game.launch(1);run(game,LOOP_TICKS+LAUNCH_TICKS);
+  expect(game.status).toBe('won');
+});
 it('does not count sand held under a lid as collectable',()=>{
   const cells=new Uint8Array(WIDTH*HEIGHT);cells.fill(1);
   const field=Array<BucketSpec|null>(16).fill(null);

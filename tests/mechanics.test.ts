@@ -81,6 +81,9 @@ it('holds covered grains until the matching key bucket fills, also opening its g
   const game=new Game(level);advance(game,10);expect(game.cells[5*WIDTH+5]).toBe(2);
   game.launch(0);for(let i=0;i<400&&game.mechanics.lids.length;i++)game.step();
   expect(game.mechanics.lids).toHaveLength(0);expect(game.mechanics.gates).toHaveLength(0);expect(game.held[5*WIDTH+5]).toBe(0);
+  advance(game,HEIGHT);
+  expect(game.cells.slice(0,(HEIGHT-1)*WIDTH).some(Boolean)).toBe(false);
+  expect(game.cells.slice((HEIGHT-1)*WIDTH)).toContain(2);
 });
 it('rejects intersecting regions, missing keys and duplicate bucket IDs',()=>{
   const level=fixture({0:bucket(0),1:bucket(1),4:bucket(2),5:bucket(3)},l=>{l.mechanics!.trays=[[0,1,5,4]];l.mechanics!.queues=[{cell:0,buckets:[bucket(4)]}];});

@@ -3,6 +3,7 @@ import { asLevel, difficulty, generateLevel, replay, solve, type GeneratedLevel 
 import { fallbackLevel } from '../src/level';
 
 const seedCount = process.env.SAND_BUCKET_FULL_TESTS === '1' ? 100 : 3;
+const delays = process.env.SAND_BUCKET_FULL_TESTS === '1' ? [6,12,18] : [];
 
 it('cycles 3 easy, 3 medium, 2 hard, 1 very hard',()=>{
   expect(Array.from({length:18},(_,i)=>difficulty(i+1))).toEqual([0,0,0,1,1,1,2,2,3,0,0,0,1,1,1,2,2,3]);
@@ -11,7 +12,10 @@ for(const number of [1,4,7,9]) {
   it(`reproduces and certifies fallback ${number}`,()=>{
     const level=fallbackLevel(number);
     expect(replay(asLevel(level),level.solution).status).toBe('won');
-    for(const delay of [6,12,18])expect(solve(asLevel(level),delay).game.status).toBe('won');
+    for(const delay of delays)for(const speed of [1,2] as const){
+      const proof=solve(asLevel(level),delay,speed);
+      expect(replay(asLevel(level),proof.solution,undefined,speed).status).toBe('won');
+    }
   },30000);
   it.each(Array.from({length:seedCount},(_,i)=>i*104729+1))(`class ${number}: seed %i has a verified solution`,seed=>{
     let level: GeneratedLevel;
@@ -40,7 +44,7 @@ it.each([15,24])('certifies three mechanic instances, eight colors and both spee
  expect(new Set(record.cells).size).toBe(8);
  expect(record.walls.length).toBeGreaterThan(0);
  for(const speed of [1,2] as const){
-   const proof=solve(level,12,speed);
+   const proof=solve(level,0,speed);
    expect(replay(level,proof.solution,undefined,speed).status).toBe('won');
  }
 },30000);

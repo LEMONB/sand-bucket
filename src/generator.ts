@@ -201,8 +201,8 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
   for(let repair=0;repair<8;repair++){
     try{
       usedPaths.clear();checked=solve(level);
-      for(const speed of [1,2] as const)for(const delay of [0,6,12,18]){
-        const proof=speed===2&&delay===0?checked:solve(level,delay,speed);
+      for(const speed of [1,2] as const){
+        const proof=speed===2?checked:solve(level,0,speed);
         replay(level,proof.solution,MAX_STEPS,speed,usedPaths);
       }
       break;

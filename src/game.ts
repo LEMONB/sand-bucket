@@ -86,6 +86,7 @@ export class Game {
   readonly events: GameEvent[] = [];
   paths: Map<number, number[]>;
   private settled = false;
+  private readonly activeRows = new Uint8Array(HEIGHT).fill(1);
   readonly cells: Uint8Array;
   readonly field: (BucketSpec | null)[];
   readonly slots: (Bucket | null)[] = Array(BELT_LIMIT).fill(null);
@@ -215,6 +216,7 @@ export class Game {
     this.mechanics.lids=this.mechanics.lids.filter(l=>{
       if(l.key!==id)return true;
       for(let y=l.y;y<l.y+l.height;y++)this.held.fill(0,y*WIDTH+l.x,y*WIDTH+l.x+l.width);
+      this.activeRows.fill(1,Math.max(0,l.y-1),l.y+l.height);
       this.settled=false; return false;
     });
     if(before!==this.mechanics.gates.length+this.mechanics.lids.length)this.refreshField();
@@ -281,6 +283,8 @@ export class Game {
           if (!this.held[index] && this.cells[index] === bucket.color) {
             sourceX += x; sourceY += y;
             this.cells[index] = 0;
+            this.activeRows[y]=1;
+            if(y>0)this.activeRows[y-1]=1;
             bucket.filled++;
             this.collected++;
             changed = true;
@@ -301,6 +305,8 @@ export class Game {
     if (!this.settled || collected) {
       // Bottom-up traversal lets each grain move at most one row per simulation tick.
       for (let y = HEIGHT - 2; y >= 0; y--) {
+        if(!this.activeRows[y])continue;
+        this.activeRows[y]=0;
         for (let i = 0; i < WIDTH; i++) {
           const x = this.tick % 2 ? i : WIDTH - 1 - i;
           const index = y * WIDTH + x;
@@ -318,6 +324,8 @@ export class Game {
           }
           this.cells[target] = this.cells[index];
           this.cells[index] = 0;
+          this.activeRows[y]=this.activeRows[y+1]=1;
+          if(y>0)this.activeRows[y-1]=1;
           changed = true;
           moved = true;
         }
