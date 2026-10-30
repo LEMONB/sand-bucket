@@ -18,3 +18,13 @@ it('keeps level and speed while invalidating the previous generator cache',()=>{
  const p=new ProgressStore({getItem:()=>JSON.stringify({version:GENERATOR_VERSION-1,number:42,speed:2,current:{},next:{}}),setItem(){}});
  expect(p.data.number).toBe(42);expect(p.data.speed).toBe(2);expect(p.data.current).toBeUndefined();expect(p.data.next).toBeUndefined();
 });
+it('remembers seen mechanics across reloads and generator upgrades',()=>{
+ const s=storage(),p=new ProgressStore(s);p.markMechanicsSeen([0,7,7,99]);
+ expect(new ProgressStore(s).data.seenMechanics).toEqual([0,7]);
+ p.data.version=GENERATOR_VERSION-1;p.save();
+ expect(new ProgressStore(s).data.seenMechanics).toEqual([0,7]);
+});
+it('filters malformed seen-mechanic records',()=>{
+ const p=new ProgressStore({getItem:()=>JSON.stringify({number:2,seenMechanics:[0,0,'1',null,-1,8,2.5,7]}),setItem(){}});
+ expect(p.data.seenMechanics).toEqual([0,7]);
+});

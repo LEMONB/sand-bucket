@@ -5,7 +5,7 @@ for(let art=0;art<100;art++){
   for(let columns=4;columns<=7;columns++){
     let level;
     for(let attempt=0;attempt<8&&!level;attempt++){
-      try{level=generateLevel(art+1,(seedFor(art+1)+attempt)>>>0,columns);}catch(error){if(attempt===7)throw error;}
+      try{level=generateLevel(art+1,(seedFor(art+1)+attempt)>>>0,columns);}catch(error){if(attempt===7)throw new Error(`Картина ${art+1}, поле ${columns}×${columns}`,{cause:error});}
     }
     const {cells:_,...saved}=level!;
     levels.push(saved);

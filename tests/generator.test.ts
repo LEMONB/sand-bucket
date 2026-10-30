@@ -34,6 +34,16 @@ it.each([11,14,17,20,23,26,29,32])('certifies a combination of two mechanics at 
  const level=generateLevel(number);expect(level.kinds).toHaveLength(2);
  expect(replay(asLevel(level),level.solution).status).toBe('won');
 },30000);
+it.each([15,24])('certifies three mechanic instances, eight colors and both speeds at level %i',number=>{
+ const record=generateLevel(number),level=asLevel(record);
+ expect(record.kinds).toHaveLength(3);
+ expect(new Set(record.cells).size).toBe(8);
+ expect(record.walls.length).toBeGreaterThan(0);
+ for(const speed of [1,2] as const){
+   const proof=solve(level,12,speed);
+   expect(replay(level,proof.solution,undefined,speed).status).toBe('won');
+ }
+},30000);
 it('rejects invalid generation input and incomplete proofs',()=>{
   expect(()=>generateLevel(-1)).toThrow();expect(()=>generateLevel(1,-1)).toThrow();
   const level=fallbackLevel(1);expect(()=>replay(asLevel(level),level.solution.slice(1))).toThrow();

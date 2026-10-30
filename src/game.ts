@@ -5,14 +5,14 @@ export const BELT_LIMIT = 5;
 export const LOOP_TICKS = 360;
 export const COLLECTION_DEPTH = 5;
 export const LAUNCH_TICKS = 36;
-export const PALETTE = ['#000000', '#51b8ad', '#ed846e', '#f4cf73', '#b8acd6'];
-export const COLOR_NAMES = ['', 'Мятное', 'Коралловое', 'Золотое', 'Сиреневое'];
+export const PALETTE = ['#000000', '#51b8ad', '#ed846e', '#f4cf73', '#b8acd6', '#557ccb', '#84ad53', '#e5b943', '#d370aa'];
+export const COLOR_NAMES = ['', 'Мятное', 'Коралловое', 'Золотое', 'Сиреневое', 'Синее', 'Зелёное', 'Жёлтое', 'Розовое'];
 
 export interface BucketSpec {
   id: number;
   color: number;
   capacity: number;
-  alternate?: number;
+  swapWith?: number;
 }
 
 export interface Level {
@@ -36,6 +36,7 @@ export type Speed = 1 | 2;
 export interface GameEvent {
   type: 'launch' | 'arrive' | 'complete' | 'collect';
   tick: number;
+  motionTick?: number;
   slot: number;
   bucket: Bucket;
   path?: number[];
@@ -91,6 +92,7 @@ export class Game {
   readonly total: number;
   collected = 0;
   tick = 0;
+  motionTick = 0;
   status: Status = 'playing';
   revision = 0;
 
@@ -99,7 +101,7 @@ export class Game {
     this.walls = new Set(level.walls ?? []);
     this.mechanics = structuredClone(level.mechanics ?? emptyMechanics());
     this.palette = level.palette ? [...level.palette] : [...PALETTE];
-    if (this.palette.length !== 5 || this.palette.some(c => !/^#[0-9a-f]{6}$/i.test(c))) throw new Error('Неверная палитра');
+    if (this.palette.length !== PALETTE.length || this.palette.some(c => !/^#[0-9a-f]{6}$/i.test(c))) throw new Error('Неверная палитра');
     if (!Number.isInteger(this.columns) || this.columns < 4 || this.columns > 7 ||
         level.cells.length !== WIDTH * HEIGHT || level.field.length !== this.columns ** 2) {
       throw new Error('Неверный размер уровня');
@@ -107,8 +109,8 @@ export class Game {
     if ([...this.walls].some(i => !Number.isInteger(i) || i < 0 || i >= level.field.length || level.field[i] !== null)) {
       throw new Error('Неверные стены уровня');
     }
-    const sand = [0, 0, 0, 0, 0];
-    const space = [0, 0, 0, 0, 0];
+    const sand = Array(PALETTE.length).fill(0);
+    const space = Array(PALETTE.length).fill(0);
     const ids = new Set<number>();
     for (const color of level.cells) {
       if (color >= PALETTE.length) {
@@ -122,16 +124,19 @@ export class Game {
       if (!Number.isInteger(bucket.id) || bucket.id < 0 || ids.has(bucket.id) ||
           !Number.isInteger(bucket.color) || bucket.color < 1 || bucket.color >= PALETTE.length ||
           !Number.isInteger(bucket.capacity) || bucket.capacity <= 0 ||
-          (bucket.alternate !== undefined && (!Number.isInteger(bucket.alternate) || bucket.alternate < 1 || bucket.alternate > 4 || bucket.alternate === bucket.color))) {
+          (bucket.swapWith !== undefined && (!Number.isInteger(bucket.swapWith) || bucket.swapWith < 0 || bucket.swapWith === bucket.id))) {
         throw new Error('Неверные параметры ведра');
       }
       ids.add(bucket.id);
       space[bucket.color] += bucket.capacity;
     }
-    const flexible = allBuckets.some(b => b?.alternate !== undefined);
-    if (sand.slice(1).reduce((a,b)=>a+b,0) !== space.slice(1).reduce((a,b)=>a+b,0) ||
-        (!flexible && sand.slice(1).some((count, i) => count !== space[i + 1]))) {
+    if (sand.slice(1).some((count,i)=>count!==space[i+1])) {
       throw new Error('Количество песка не совпадает с вместимостью вёдер');
+    }
+    for(const bucket of allBuckets)if(bucket?.swapWith!==undefined){
+      const partner=level.field.find(b=>b?.id===bucket.swapWith);
+      if(!level.field.includes(bucket)||!partner||partner.swapWith!==bucket.id||partner.capacity!==bucket.capacity||partner.color===bucket.color)
+        throw new Error('Неверная пара переключателей');
     }
     this.cells = level.cells.slice();
     this.field = level.field.map((bucket) => bucket ? { ...bucket } : null);
@@ -159,7 +164,7 @@ export class Game {
     for (const t of this.mechanics.trays) {
       region(t);
       const [a,b,c,d] = t;
-      if (t.length !== 4 || a % this.columns === this.columns-1 || b !== a+1 || c !== b+this.columns || d !== a+this.columns || t.some(i => this.walls.has(i) || this.field[i]?.alternate)) throw new Error('Неверный поднос');
+      if (t.length !== 4 || a % this.columns === this.columns-1 || b !== a+1 || c !== b+this.columns || d !== a+this.columns || t.some(i => this.walls.has(i) || this.field[i]?.swapWith!==undefined)) throw new Error('Неверный поднос');
     }
     for (const b of this.mechanics.bridges) { region(b.cells); region(b.passage); if (b.passage.some(i=>this.field[i]) || b.cells.some(i=>!this.field[i])) throw new Error('Неверный мост'); }
     for (const g of this.mechanics.gates) { region(g.cells); if (!ids.has(g.key) || g.cells.some(i=>this.field[i])) throw new Error('Неверный замок'); }
@@ -197,7 +202,10 @@ export class Game {
       const buckets=cells.map(i=>this.field[i]);
       cells.forEach((i,j)=>{this.field[i]=buckets[(j+3)%4];});
     }
-    for(const bucket of this.field) if(bucket?.alternate) [bucket.color,bucket.alternate]=[bucket.alternate,bucket.color];
+    for(const bucket of this.field)if(bucket?.swapWith!==undefined&&bucket.id<bucket.swapWith){
+      const partner=this.field.find(b=>b?.id===bucket.swapWith)!;
+      [bucket.color,partner.color]=[partner.color,bucket.color];
+    }
     this.pendingField=false; this.refreshField();
   }
 
@@ -223,7 +231,7 @@ export class Game {
 
   launch(bucketId: number): LaunchResult {
     if (this.status !== 'playing') return 'finished';
-    if (this.tick < this.busyUntil) return 'blocked';
+    if (this.motionTick < this.busyUntil) return 'blocked';
     const index = this.field.findIndex((bucket) => bucket?.id === bucketId);
     if (index < 0) return 'empty';
     if (!this.paths.has(index)) return 'blocked';
@@ -237,27 +245,33 @@ export class Game {
     if(partnerIndex>=0&&this.paths.has(partnerIndex)&&this.slots.filter(b=>!b).length>=2) indexes.push(partnerIndex);
     if(pair)this.mechanics.links=this.mechanics.links.filter(p=>p!==pair);
     for(const position of indexes) {
+      const departing=this.field[position]!;
+      if(departing.swapWith!==undefined){
+        const partner=this.field.find(b=>b?.id===departing.swapWith)!;
+        delete partner.swapWith;delete departing.swapWith;
+      }
       const free=this.slots.indexOf(null);
-      this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.tick+LAUNCH_TICKS};
-      this.events.push({type:'launch',tick:this.tick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!,partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
+      this.slots[free]={...this.field[position]!,filled:0,arrivalTick:this.motionTick+LAUNCH_TICKS};
+      this.events.push({type:'launch',tick:this.tick,motionTick:this.motionTick,slot:free,bucket:{...this.slots[free]},path:this.paths.get(position)!,partnerId:indexes.length===2?pair?.find(id=>id!==this.slots[free]!.id):undefined});
       this.field[position]=null;
     }
     this.turns++;
-    const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.bridges.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.alternate));
-    if(changes) { this.pendingField=true; this.busyUntil=this.tick+LAUNCH_TICKS+10; }
+    const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.bridges.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.swapWith!==undefined));
+    if(changes) { this.pendingField=true; this.busyUntil=this.motionTick+LAUNCH_TICKS+10; }
     this.refreshField();
     return 'ok';
   }
 
-  step(): void {
+  step(motionDelta=1): void {
     if (this.status !== 'playing') return;
     this.tick++;
-    if(this.pendingField && this.tick>=this.busyUntil-10)this.finishFieldMove();
+    const previousMotion=this.motionTick;this.motionTick+=motionDelta;
+    if(this.pendingField && this.motionTick>=this.busyUntil-10)this.finishFieldMove();
     let changed = false;
     for (let slot = 0; slot < BELT_LIMIT; slot++) {
       const bucket = this.slots[slot];
-      if (!bucket || this.tick < bucket.arrivalTick) continue;
-      if (this.tick === bucket.arrivalTick) this.events.push({ type: 'arrive', tick: this.tick, slot, bucket: { ...bucket } });
+      if (!bucket || this.motionTick < bucket.arrivalTick) continue;
+      if (previousMotion < bucket.arrivalTick && this.motionTick >= bucket.arrivalTick) this.events.push({ type: 'arrive', tick: this.tick, slot, bucket: { ...bucket } });
       const beforeFill = bucket.filled;
       let sourceX = 0, sourceY = 0;
       const center = Math.floor(this.slotPosition(slot) * WIDTH);
@@ -313,7 +327,7 @@ export class Game {
     if (changed) this.revision++;
     if (this.collected === this.total) {
       this.status = 'won';
-    } else if (this.settled && !this.pendingField && !this.slots.some(b=>b&&b.arrivalTick>this.tick)) {
+    } else if (this.settled && !this.pendingField && !this.slots.some(b=>b&&b.arrivalTick>this.motionTick)) {
       const free=this.slots.filter(b=>!b).length;
       const canLaunch=free>0&&[...this.paths.keys()].some(i=>{
         const pair=this.mechanics.links.find(p=>p.includes(this.field[i]!.id));
@@ -330,11 +344,11 @@ export class Game {
   }
 }
 
-/** Both speed modes execute the same fixed simulation steps, never larger steps. */
+/** Speed changes physics frequency; bucket travel always uses the same real-time clock. */
 export function advanceFrame(game: Game, seconds: number, speed: Speed, remainder: number): number {
   remainder += Math.max(0, Math.min(seconds, 0.1)) * speed;
   while (remainder + 1e-10 >= 1 / 60) {
-    game.step();
+    game.step(2/speed);
     remainder -= 1 / 60;
   }
   return Math.max(0, remainder);

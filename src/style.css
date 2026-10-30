@@ -77,3 +77,5 @@ progress::-moz-progress-bar { background: #69aa91; }
 @media (max-height: 760px) { .intro { margin-top: 28px; margin-bottom: 23px; } .preview-wrap { height: 170px; } #play { margin-top: 18px; } .game-header { margin-bottom: 12px; } .game { padding-top: 10px; } .hint:empty { display: none; }
 .hint { margin-top: 12px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+.app-version { text-align: center; font-size: 11px; color: #64766b; margin-top: 12px; padding-bottom: env(safe-area-inset-bottom); }

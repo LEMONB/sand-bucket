@@ -31,7 +31,7 @@ export class FieldView {
     this.freeSlots=freeSlots;
     this.revision=game.fieldRevision;
     const previous=this.overlays;this.overlays=new Map();
-    const rotated=this.turns!==game.turns&&game.tick>=game.busyUntil-10;
+    const rotated=this.turns!==game.turns&&game.motionTick>=game.busyUntil-10;
     const overlay=(key:string,className:string,parent=this.host)=>{
       const element=previous.get(key)??document.createElement('div');
       element.className=className;element.setAttribute('aria-hidden','true');
@@ -63,13 +63,14 @@ export class FieldView {
       if(!bucket){button.setAttribute('aria-label',blocked.has(i)?'Закрытый проход':'Пустое место');continue;}
       button.style.setProperty('--color',game.palette[bucket.color]);
       nextPositions.set(bucket.id,i);
+      const swapPartner=bucket.swapWith===undefined?undefined:game.field.find(b=>b?.id===bucket.swapWith);
       const key=game.mechanics.gates.some(g=>g.key===bucket.id),lid=game.mechanics.lids.some(l=>l.key===bucket.id);
-      mark.textContent=key?'⚿':lid?'◇':bucket.alternate?'↻':'';
+      mark.textContent=key?'⚿':lid?'◇':swapPartner?'⇄':'';
       const queue=game.mechanics.queues.find(q=>q.cell===i);
       if(queue?.buckets.length)extra.innerHTML=`<span class="queue-colors">${queue.buckets.map(b=>`<i style="background:${game.palette[b.color]}"></i>`).join('')}</span><small>${queue.buckets.length+1}/5</small>`;
-      if(bucket.alternate)extra.innerHTML=`<i class="alternate-color" style="background:${game.palette[bucket.alternate]}"></i>`;
-      const name=game.palette[1]===PALETTE[1]?COLOR_NAMES[bucket.color]:['','Тёмное','Бирюзовое','Песочное','Коралловое'][bucket.color];
-      button.setAttribute('aria-label',`${name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${bucket.alternate?', меняет цвет после хода':''}${queue?`, в очереди ${queue.buckets.length+1}`:''}`);
+      if(swapPartner)extra.innerHTML=`<i class="alternate-color" style="background:${game.palette[swapPartner.color]}"></i><small>⇄ ${Math.min(bucket.id,swapPartner.id)+1}</small>`;
+      const name=game.palette[1]===PALETTE[1]?COLOR_NAMES[bucket.color]:['','Тёмное','Бирюзовое','Песочное','Коралловое','Синее','Зелёное','Жёлтое','Фиолетовое'][bucket.color];
+      button.setAttribute('aria-label',`${name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, в очереди ${queue.buckets.length+1}`:''}`);
       const old=this.positions.get(bucket.id);
       const base=available?'rotate(0deg) scale(1)':'rotate(180deg) scale(.7)';
       if(old!==undefined&&old!==i){

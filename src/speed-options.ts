@@ -1,0 +1,12 @@
+import './style.css';
+import './interface.css';
+import './speed-options.css';
+import {bucketIcon} from './bucket-icon';
+import {catalogArtwork,artworkPalette} from './art-catalog';
+const palette=artworkPalette(3),cells=catalogArtwork(3);
+const titles=['Плоская кнопка по центру'];
+const captions=['Обновлённый вариант: плашка 44 × 10 px.'];
+const button='<button class="option-speed" aria-label="Переключить скорость"><span>×2</span></button>';
+document.querySelector('#options')!.innerHTML=`<header><h1>×2 по центру ленты</h1><p>Кнопка плоская; область нажатия остаётся удобной.</p></header><main>${titles.map((title,i)=>`<article><h2>${i+1}. ${title}</h2><p>${captions[i]}</p><div class="phone option-${i+1}"><div class="mock-header"><span>↻</span><span>‹</span><b>УРОВЕНЬ 12</b><small>Средний ⓘ</small></div><div class="mock-status"><span>24%</span><progress max="100" value="24"></progress><span>3 / 5</span></div><div class="mock-sand"><canvas width="128" height="128"></canvas></div><div class="belt-row"><div class="mock-belt">${Array.from({length:5},(_,j)=>`<div class="mock-slot" style="left:${j*20}%">${j<3?`<div class="slot-bucket" style="color:${palette[j+1]}">${bucketIcon}</div>`:''}</div>`).join('')}${i===1?button:''}</div>${i!==1?button:''}</div><div class="mock-field">${Array.from({length:25},(_,j)=>`<div class="field-bucket ${j<5?'is-available':'is-blocked'}" style="--color:${palette[j%8+1]}"><span class="bucket-shape">${bucketIcon}</span></div>`).join('')}</div></div></article>`).join('')}</main>`;
+document.querySelectorAll<HTMLCanvasElement>('canvas').forEach(canvas=>{const ctx=canvas.getContext('2d')!;cells.forEach((c,i)=>{ctx.fillStyle=palette[c];ctx.fillRect(i%128,Math.floor(i/128),1,1);});});
+document.querySelectorAll<HTMLButtonElement>('.option-speed').forEach(b=>b.onclick=()=>{b.firstElementChild!.textContent=b.textContent==='×2'?'×1':'×2';});

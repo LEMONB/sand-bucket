@@ -4,7 +4,7 @@ import { Game, HEIGHT, PALETTE, WIDTH } from './game';
 // One image buffer and precomputed grain colors, reused across every frame/level.
 export class SandPainter {
   private readonly image: ImageData;
-  private readonly shades = new Uint8ClampedArray(WIDTH * HEIGHT * 4 * 3);
+  private readonly shades = new Uint8ClampedArray(WIDTH * HEIGHT * (PALETTE.length-1) * 3);
   constructor(private context: CanvasRenderingContext2D) {
     this.image = context.createImageData(WIDTH, HEIGHT);
     this.setPalette(PALETTE);
@@ -14,8 +14,8 @@ export class SandPainter {
     for (let i = 0; i < WIDTH * HEIGHT; i++) {
       const noise = Math.imul(i ^ (i >>> 7), 0x45d9f3b);
       const shade = ((noise ^ (noise >>> 16)) >>> 0) % 17 - 8;
-      for (let c = 1; c <= 4; c++) {
-        const offset = (i * 4 + c - 1) * 3, color = colors[c];
+      for (let c = 1; c < palette.length; c++) {
+        const offset = (i * (PALETTE.length-1) + c - 1) * 3, color = colors[c];
         this.shades[offset] = (color >> 16) + shade;
         this.shades[offset + 1] = ((color >> 8) & 255) + shade;
         this.shades[offset + 2] = (color & 255) + shade;
@@ -25,7 +25,7 @@ export class SandPainter {
   draw(cells: Uint8Array): void {
     const pixels = this.image.data;
     for (let i = 0; i < cells.length; i++) {
-      const offset = (i * 4 + cells[i] - 1) * 3, p = i * 4;
+      const offset = (i * (PALETTE.length-1) + cells[i] - 1) * 3, p = i * 4;
       if (!cells[i]) { pixels[p + 3] = 0; continue; }
       pixels[p] = this.shades[offset]; pixels[p + 1] = this.shades[offset + 1]; pixels[p + 2] = this.shades[offset + 2]; pixels[p + 3] = 255;
     }

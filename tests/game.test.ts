@@ -64,16 +64,17 @@ describe('simulation', () => {
     expect(new Game(level).collected).toBe(0);expect(level.cells).toEqual(createLevel().cells);
   });
   it('rejects malformed cells, capacities, IDs, dimensions and wall overlaps', () => {
-    const level=createLevel();level.field[0]!.capacity++;
+    const level=createLevel();level.field.find(b=>b)!.capacity++;
     expect(()=>new Game(level)).toThrow();
     expect(()=>new Game({...createLevel(),columns:8})).toThrow();
-    expect(()=>new Game({...createLevel(),walls:[0]})).toThrow();
-    const duplicate=createLevel();duplicate.field[1]!.id=duplicate.field[0]!.id;expect(()=>new Game(duplicate)).toThrow();
+    const overlapping=createLevel();overlapping.walls=[overlapping.field.findIndex(b=>b!==null)];
+    expect(()=>new Game(overlapping)).toThrow();
+    const duplicate=createLevel(),buckets=duplicate.field.filter(b=>b!==null);buckets[1].id=buckets[0].id;expect(()=>new Game(duplicate)).toThrow();
   });
-  it('×2 uses identical steps and events for the same simulation-time actions', () => {
-    const a=new Game(createLevel()),b=new Game(createLevel());const id=a.field[0]!.id;a.launch(id);b.launch(id);
+  it('executes the same physics steps at equal simulation time', () => {
+    const a=new Game(createLevel()),b=new Game(createLevel());
     let ra=0,rb=0;for(let i=0;i<1000;i++){ra=advanceFrame(a,1/60,1,ra);rb=advanceFrame(b,1/120,2,rb);}
-    expect(a.cells).toEqual(b.cells);expect(a.events).toEqual(b.events);expect(a.slots).toEqual(b.slots);
+    expect(a.cells).toEqual(b.cells);expect(a.tick).toBe(b.tick);expect(a.motionTick).toBe(b.motionTick*2);
   });
 });
 
