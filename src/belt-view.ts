@@ -1,9 +1,10 @@
 import { bucketPosition, landingMotion } from './bucket-motion';
 import { bucketIcon } from './bucket-icon';
+import { bucketMarks, yokeIcon } from './game-icons';
 import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent, type Speed } from './game';
 
 export class BeltView {
-  private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number }[][] = [];
+  private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number; marks: HTMLElement }[][] = [];
   private readonly effects: { element: HTMLElement; rope: HTMLElement; x:number; y:number; active: boolean; event?: GameEvent; started: number }[] = [];
   private readonly stream = document.createElement('canvas');
   private readonly streamContext = this.stream.getContext('2d')!;
@@ -23,17 +24,17 @@ export class BeltView {
       const views=[];
       for(let fragment=0;fragment<2;fragment++) {
         const element=document.createElement('div');element.className='mock-slot';element.setAttribute('aria-hidden','true');
-        element.innerHTML=`<div class="slot-bucket">${bucketIcon}<i class="mock-fill"></i><small></small></div>`;
+        element.innerHTML=`<div class="slot-bucket">${bucketIcon}<span class="belt-marks"></span><i class="mock-fill"></i><small></small></div>`;
         belt.append(element);
-        views.push({slot:element,bucket:element.firstElementChild as HTMLElement,fill:element.querySelector('i')!,label:element.querySelector('small')!,id:-1,percent:-1});
+        views.push({slot:element,bucket:element.firstElementChild as HTMLElement,fill:element.querySelector('i')!,label:element.querySelector('small')!,id:-1,percent:-1,marks:element.querySelector<HTMLElement>('.belt-marks')!});
       }
       this.views.push(views);
     }
     // At most five launches plus recent completions; reuse a bounded visual pool.
     for(let i=0;i<20;i++) {
       const element=document.createElement('div');element.className='flying-bucket';element.hidden=true;element.setAttribute('aria-hidden','true');
-      element.innerHTML=`${bucketIcon}<i class="completion-fill"></i><span class="sparkles">✦ · ✧</span>`;document.body.append(element);
-      const rope=document.createElement('div');rope.className='pair-rope flying-rope';rope.hidden=true;rope.setAttribute('aria-hidden','true');document.body.append(rope);
+      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><span class="sparkles">✦ · ✧</span>`;document.body.append(element);
+      const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');document.body.append(rope);
       this.effects.push({element,rope,x:0,y:0,active:false,started:0});
     }
   }
@@ -48,7 +49,7 @@ export class BeltView {
     const shape=this.field.querySelector('.bucket-shape');
     if(shape)this.grainSize=shape.getBoundingClientRect().width;
   }
-  reset(): void { this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.rope.hidden=true;} }
+  reset(): void { this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.rope.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
   draw(game: Game, seconds: number, speed:Speed=1): void {
     this.clock+=seconds*2;this.sandClock+=seconds*speed;
@@ -66,6 +67,7 @@ export class BeltView {
       if(!effect)continue;
       effect.active=true;effect.event=event;effect.started=this.clock;effect.element.hidden=false;
       effect.element.style.color=game.palette[event.bucket.color];
+      effect.element.querySelector('.belt-marks')!.innerHTML=bucketMarks(game,event.bucket);
       effect.element.classList.toggle('completion',event.type==='complete');
       effect.element.style.width=`${event.type==='complete'?48:this.grainSize}px`;
     }
@@ -79,7 +81,7 @@ export class BeltView {
         const x=(fragment===0?position:position+(position<.5?1:-1))*this.beltRect.width;
         view.slot.style.transform=`translateX(${x-27}px)`;
         view.bucket.hidden=!visible;
-        if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=game.palette[bucket.color];}
+        if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=game.palette[bucket.color];view.marks.innerHTML=bucketMarks(game,bucket);}
         const settle=this.reduced.matches||!bucket?0:landingMotion((game.motionTick-bucket.arrivalTick)/16);
         view.bucket.style.transform=`translateY(${settle*5}px) scale(${1+settle*.09},${1-settle*.1})`;
         if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
@@ -135,7 +137,7 @@ export class BeltView {
       effect.rope.hidden=!visible;
       if(visible){
         const dx=partner!.x-effect.x,dy=partner!.y-effect.y;
-        Object.assign(effect.rope.style,{left:`${effect.x}px`,top:`${effect.y}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
+        Object.assign(effect.rope.style,{left:`${effect.x}px`,top:`${effect.y-19}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
       }
     }
   }

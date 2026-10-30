@@ -5,7 +5,7 @@
 Sand Bucket is a TypeScript/PixiJS browser game and offline PWA, built with Vite and hosted on GitHub Pages.
 
 - `src/game.ts` owns simulation and rules; `renderer.ts`, `belt-view.ts`, and `field-view.ts` render gameplay.
-- `src/generator.ts`, `level-mechanics.ts`, and `level.worker.ts` generate and certify levels. `src/levels/art-fallbacks.json` contains generated fallback data.
+- `src/generator.ts`, `level-mechanics.ts`, and `scripts/campaign/` prepare and certify levels offline. `src/campaign.ts` loads the ready `src/levels/campaign.json`; the browser does not generate levels.
 - `src/progress.ts` persists local progress; `art-catalog.ts` and `art-scenes.ts` define artwork.
 - `tests/` contains Vitest tests; `public/` contains icons and the PWA manifest; `scripts/` contains generation and build checks.
 - Root preview pages such as `interface.html` and `review.html` support visual development. `dist/` is generated output.
@@ -21,7 +21,10 @@ Use Node.js 22.12 or newer; CI uses Node.js 24.
 - `npm run build`: type-check, build production assets, and verify offline assets.
 - `npm run preview`: serve the production build locally.
 - `npm run test:full`: manually run the extensive generator sweep.
-- `npm run generate:level`: regenerate certified fallback levels; use deliberately after generation changes.
+- `npm run campaign:pilot`: prepare 20 representative campaign positions.
+- `npm run campaign:generate`: prepare all 400 levels, resume from cache, and atomically publish a complete catalog.
+- `npm run campaign:verify`: replay all catalog proofs from the preparation cache.
+- `npm run generate:level`: regenerate legacy fallback fixtures used by regression tests.
 
 ## Coding Style & Naming Conventions
 

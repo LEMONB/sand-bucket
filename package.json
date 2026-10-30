@@ -13,7 +13,10 @@
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
     "generate:level": "node --experimental-strip-types scripts/generate-level.ts",
-    "test:full": "SAND_BUCKET_FULL_TESTS=1 vitest run"
+    "test:full": "SAND_BUCKET_FULL_TESTS=1 vitest run",
+    "campaign:pilot": "node --experimental-strip-types scripts/prepare-campaign.ts --pilot",
+    "campaign:generate": "node --experimental-strip-types scripts/prepare-campaign.ts --all",
+    "campaign:verify": "node --experimental-strip-types scripts/prepare-campaign.ts --verify"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"

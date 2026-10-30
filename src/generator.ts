@@ -66,7 +66,7 @@ class Unsolved extends Error {
 export function solve(level: Level, delay = 0, speed:Speed=2): {game:Game;solution:Move[]} {
   const game=new Game(level),solution:Move[]=[];
   let readyAt=-1;
-  while(game.status==='playing'&&game.tick<MAX_STEPS){
+  while(game.status==='playing'&&game.tick<MAX_STEPS+delay*level.field.length){
     const exposed=exposedColors(game);
     const index=[...game.paths.keys()].sort((a,b)=>game.field[a]!.color-game.field[b]!.color||game.field[a]!.capacity-game.field[b]!.capacity).find(i=>{
       const b=game.field[i]!;
@@ -93,7 +93,7 @@ export function solve(level: Level, delay = 0, speed:Speed=2): {game:Game;soluti
 }
 
 // Shorten a stalled bucket and keep its remaining sand in a later bucket of that color.
-function rebalance(level:Level,failed:Game):boolean {
+export function rebalance(level:Level,failed:Game):boolean {
   const all=[...level.field,...(level.mechanics?.queues.flatMap(q=>q.buckets)??[]),...(level.mechanics?.platforms.flatMap(p=>p.next)??[])].filter((b):b is BucketSpec=>!!b);
   const later=[...failed.field,...failed.mechanics.queues.flatMap(q=>q.buckets),...failed.mechanics.platforms.flatMap(p=>p.next)].filter((b):b is BucketSpec=>!!b);
   const reserved=new Set([...(level.walls??[]),...(level.mechanics?.trays.flat()??[]),...(level.mechanics?.gates.flatMap(g=>g.cells)??[]),...(level.mechanics?.bridges.flatMap(b=>[...b.cells,...b.passage])??[]),...(level.mechanics?.platforms.flatMap(p=>p.cells)??[]),...(level.mechanics?.queues.map(q=>q.cell)??[])]);
@@ -115,11 +115,11 @@ function rebalance(level:Level,failed:Game):boolean {
   return false;
 }
 
-function candidate(number: number, seed: number, random: () => number, fallbackColumns?:number): GeneratedLevel {
-  const columns = fallbackColumns ?? difficulty(number) + 4;
-  const kinds=fallbackColumns ? [] : mechanicsFor(number,columns);
-  const wallCount = kinds.length || columns === 4 ? 0 : (columns - 4) * 2 - Math.floor(random() * 2);
-  const walls = new Set<number>();
+function candidate(number: number, seed: number, random: () => number, fallbackColumns?:number, profile?:GenerationProfile): GeneratedLevel {
+  const columns = profile?.columns ?? fallbackColumns ?? difficulty(number) + 4;
+  const kinds=profile?.kinds ?? (fallbackColumns ? [] : mechanicsFor(number,columns));
+  const wallCount = profile || kinds.length || columns === 4 ? 0 : (columns - 4) * 2 - Math.floor(random() * 2);
+  const walls = new Set<number>(profile?.walls);
   const empty = Array<BucketSpec | null>(columns ** 2).fill(null);
   for (let trial = 0; walls.size < wallCount && trial < 100; trial++) {
     const index = columns + Math.floor(random() * (columns ** 2 - columns));
@@ -133,7 +133,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
     }
     if (!connected) walls.delete(index);
   }
-  if (walls.size !== wallCount) throw new Error('Не удалось разместить стены');
+  if (!profile && walls.size !== wallCount) throw new Error('Не удалось разместить стены');
   const art=artworkIndex(number),cells = catalogArtwork(art),palette=artworkPalette(art);
   const counts = Array(PALETTE.length).fill(0);
   for (const color of cells) counts[color]++;
@@ -194,7 +194,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
     field[position] = specs[id]; occupancy[position] = null;
   }
   let mechanics:Mechanics|undefined;
-  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds,random));
+  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds,random,walls));
   const level: Level = { cells, field, columns, walls: [...walls], mechanics,palette };
   let checked:ReturnType<typeof solve>|undefined;
   const usedPaths=new Set<number>();
@@ -217,7 +217,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
   const eligible=spaces.filter(i=>!usedPaths.has(i));
   for(let i=eligible.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[eligible[i],eligible[j]]=[eligible[j],eligible[i]];}
   // None of the certified routes visits these cells, so adding walls preserves every proof.
-  eligible.slice(0,Math.ceil(spaces.length*.65)).forEach(i=>walls.add(i));
+  eligible.slice(0,profile?0:Math.ceil(spaces.length*.65)).forEach(i=>walls.add(i));
   level.walls=[...walls];replay(level,checked.solution);
   return { version: GENERATOR_VERSION, number, seed, columns, walls: [...walls], cells: [...cells], field, mechanics,kinds,art,palette, solution: checked.solution, victoryTick: checked.game.tick };
 }
@@ -229,4 +229,9 @@ export function generateLevel(number: number, seed = seedFor(number), fallbackCo
     try { return candidate(number, seed, random, fallbackColumns); } catch(error) { cause=error; }
   }
   throw new Error('Лимит генерации исчерпан', {cause});
+}
+
+export interface GenerationProfile { columns:number; kinds:number[]; walls:number[] }
+export function generateCandidate(number:number,seed:number,profile:GenerationProfile):GeneratedLevel {
+  return candidate(number,seed,randomFrom(seed),undefined,profile);
 }

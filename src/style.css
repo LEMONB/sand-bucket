@@ -79,3 +79,6 @@ progress::-moz-progress-bar { background: #69aa91; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 
 .app-version { text-align: center; font-size: 11px; color: #64766b; margin-top: 12px; padding-bottom: env(safe-area-inset-bottom); }
+
+.level-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; font-size: 14px; }
+.level-picker select { min-height: 44px; padding: 8px 14px; border: 1px solid #cdd7c6; border-radius: 12px; background: #eeeee2; color: #365c4e; font: inherit; }

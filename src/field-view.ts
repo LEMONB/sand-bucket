@@ -1,6 +1,17 @@
 import { trayPosition } from './bucket-motion';
 import { bucketIcon } from './bucket-icon';
+import { bucketMarks, gameIcon, keyColor, nextBuckets, yokeIcon } from './game-icons';
 import { COLOR_NAMES, PALETTE, type Game } from './game';
+
+export function wallConnections(index:number,columns:number,walls:ReadonlySet<number>):string[] {
+  if(!walls.has(index))return [];
+  const connections:string[]=[];
+  if(index>=columns&&walls.has(index-columns))connections.push('wall-up');
+  if(index%columns<columns-1&&walls.has(index+1))connections.push('wall-right');
+  if(walls.has(index+columns))connections.push('wall-down');
+  if(index%columns>0&&walls.has(index-1))connections.push('wall-left');
+  return connections;
+}
 
 export class FieldView {
   private revision=-1;
@@ -45,29 +56,28 @@ export class FieldView {
     const nextPositions=new Map<number,number>();
     for(const [i,button] of this.buttons.entries()){
       const bucket=game.field[i];
+      const hidden=!!bucket&&game.isHidden(bucket);
       const available=!!bucket&&game.paths.has(i);
       button.className=`field-bucket ${blocked.has(i)?'mechanic-wall':!bucket?'is-empty':available?'is-available':'is-blocked'}`;
+      if(game.walls.has(i))button.classList.add('solid-wall',...wallConnections(i,game.columns,game.walls));
       button.classList.toggle('on-surface',surfaceCells.has(i));
+      button.classList.toggle('is-hidden',hidden);
       button.disabled=!available;
       button.style.gridColumn=String(i%game.columns+1);button.style.gridRow=String(Math.floor(i/game.columns)+1);
       const shape=button.querySelector<HTMLElement>('.bucket-shape')!,mark=button.querySelector<HTMLElement>('.bucket-mark')!,extra=button.querySelector<HTMLElement>('.bucket-extra')!;
       if(button.dataset.bucket!==String(bucket?.id)){shape.getAnimations().forEach(a=>a.cancel());button.dataset.bucket=String(bucket?.id);}
       mark.textContent='';extra.innerHTML='';
-      if(blocked.has(i)){
-        const gate=game.mechanics.gates.some(g=>g.cells.includes(i));
-        extra.textContent=gate?'⚿':'';
-      }
       if(!bucket){button.setAttribute('aria-label',blocked.has(i)?'Закрытый проход':'Пустое место');continue;}
-      button.style.setProperty('--color',game.palette[bucket.color]);
+      button.style.setProperty('--color',hidden?'#9ba49e':game.palette[bucket.color]);
       nextPositions.set(bucket.id,i);
       const swapPartner=bucket.swapWith===undefined?undefined:game.field.find(b=>b?.id===bucket.swapWith);
       const key=game.mechanics.gates.some(g=>g.key===bucket.id),lid=game.mechanics.lids.some(l=>l.key===bucket.id);
-      mark.textContent=key?'⚿':lid?'◇':swapPartner?'⇄':'';
+      mark.innerHTML=hidden?gameIcon('mystery'):'';
       const queue=game.mechanics.queues.find(q=>q.cell===i);
-      if(queue?.buckets.length)extra.innerHTML=`<span class="queue-colors">${queue.buckets.map(b=>`<i style="background:${game.palette[b.color]}"></i>`).join('')}</span><small>${queue.buckets.length+1}/5</small>`;
-      if(swapPartner)extra.innerHTML=`<i class="alternate-color" style="background:${game.palette[swapPartner.color]}"></i><small>⇄ ${Math.min(bucket.id,swapPartner.id)+1}</small>`;
+      extra.innerHTML=bucketMarks(game,bucket,hidden);
+      if(queue?.buckets.length)extra.innerHTML+=`<span class="queue-colors">${nextBuckets(game,queue.buckets,queue.hidden)}</span><small class="queue-count">${queue.buckets.length+1}/5</small>`;
       const name=game.palette[1]===PALETTE[1]?COLOR_NAMES[bucket.color]:['','Тёмное','Бирюзовое','Песочное','Коралловое','Синее','Зелёное','Жёлтое','Фиолетовое'][bucket.color];
-      button.setAttribute('aria-label',`${name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, в очереди ${queue.buckets.length+1}`:''}`);
+      button.setAttribute('aria-label',`${hidden?'Скрытое':name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, в очереди ${queue.buckets.length+1}${queue.hidden&&queue.buckets.length?', цвета скрыты':''}`:''}`);
       const old=this.positions.get(bucket.id);
       const base=available?'rotate(0deg) scale(1)':'rotate(180deg) scale(.7)';
       if(old!==undefined&&old!==i){
@@ -89,7 +99,7 @@ export class FieldView {
       }
     }
     this.positions=nextPositions;
-    this.colors=new Map(game.field.filter(b=>b).map(b=>[b!.id,b!.color]));
+    this.colors=new Map(game.field.filter(b=>b&&!game.isHidden(b)).map(b=>[b!.id,b!.color]));
     const surface=(cells:number[],className:string,text='')=>{
       const xs=cells.map(i=>i%game.columns),ys=cells.map(i=>Math.floor(i/game.columns));
       const element=overlay(`${className}:${cells.join(',')}`,`mechanic-surface ${className}`);
@@ -99,24 +109,24 @@ export class FieldView {
     game.mechanics.platforms.forEach(p=>{
       const key=`platform-surface:${p.cells.join(',')}`;
       const wasUpper=previous.get(key)?.dataset.upper==='true';
-      const panel=surface(p.cells,'platform-surface',p.next.length?'Ⅱ':'Ⅰ');
+      const panel=surface(p.cells,'platform-surface');
       panel.dataset.upper=String(p.next.length>0);
       if(wasUpper&&!p.next.length)this.animate(panel,[{transform:'translateY(5px) scale(.97)'},{transform:'translateY(-2px) scale(1.01)',offset:.65},{transform:'none'}],450);
-      if(p.next.length){const colors=document.createElement('span');colors.className='platform-next';colors.innerHTML=p.next.map(b=>`<i style="background:${game.palette[b.color]}"></i>`).join('');panel.append(colors);}
+      if(p.next.length){const colors=document.createElement('span');colors.className='platform-next';colors.innerHTML=nextBuckets(game,p.next,p.hidden);panel.append(colors);}
     });
-    game.mechanics.trays.forEach(t=>{const panel=surface(t,'tray-surface','↻');if(rotated)this.animate(panel,[{transform:'rotate(-90deg)'},{transform:'rotate(0deg)'}],400);});
-    game.mechanics.gates.forEach(g=>surface(g.cells,'gate-surface','⚿'));
+    game.mechanics.trays.forEach(t=>{const panel=surface(t,'tray-surface');panel.innerHTML=gameIcon('rotate');if(rotated)this.animate(panel,[{transform:'rotate(-90deg)'},{transform:'rotate(0deg)'}],400);});
+    game.mechanics.gates.forEach(g=>{const panel=surface(g.cells,'gate-surface');panel.innerHTML=gameIcon('lock');panel.style.color=keyColor(game,g.key);});
     game.mechanics.bridges.forEach(b=>surface(b.cells,'bridge-surface'));
     game.mechanics.links.forEach(pair=>{
       const indexes=pair.map(id=>game.field.findIndex(b=>b?.id===id));
       if(indexes.some(i=>i<0))return;
       const host=this.host.getBoundingClientRect(),a=this.buttons[indexes[0]].getBoundingClientRect(),b=this.buttons[indexes[1]].getBoundingClientRect();
       const x=a.left+a.width/2-host.left,y=a.top+a.height/2-host.top,dx=b.left+b.width/2-host.left-x,dy=b.top+b.height/2-host.top-y;
-      const rope=overlay(`pair:${pair.join(',')}`,'pair-rope');
-      Object.assign(rope.style,{left:`${x}px`,top:`${y}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
+      const rope=overlay(`pair:${pair.join(',')}`,'pair-yoke');rope.innerHTML=yokeIcon;
+      Object.assign(rope.style,{left:`${x}px`,top:`${y-19}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
     });
     game.mechanics.lids.forEach(l=>{
-      const lid=overlay(`lid:${l.key}`,'sand-lid',this.sand);lid.textContent='◇';lid.setAttribute('aria-label','Песок под крышкой');
+      const lid=overlay(`lid:${l.key}`,'sand-lid',this.sand);lid.innerHTML=gameIcon('lid');lid.style.color=keyColor(game,l.key);lid.setAttribute('aria-label','Песок под крышкой');
       Object.assign(lid.style,{left:`${l.x/128*100}%`,top:`${l.y/128*100}%`,width:`${l.width/128*100}%`,height:`${l.height/128*100}%`});
     });
     previous.forEach((element,key)=>{
