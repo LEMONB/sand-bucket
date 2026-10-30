@@ -5,12 +5,12 @@ const places = ['у горного озера', 'среди островов', '
 export const ART_COUNT = 100;
 export const ART_TITLES = Array.from({length:ART_COUNT}, (_, i) => i < 3 ? subjects[i] : `${subjects[i % 10]} ${places[Math.floor(i / 10)]}`);
 export function artworkIndex(number: number): number { return (number - 1) % ART_COUNT; }
-export function artworkPalette(index: number): string[] { return ['#000000', ...SCENE_PALETTES[index % 3]]; }
+export function artworkPalette(index: number): string[] { return ['#000000', ...SCENE_PALETTES[index % 3], '#557ccb', '#84ad53', '#e5b943', '#ad78ba']; }
 
 // Original geometric motifs and compositions. No downloaded images or third-party assets.
 export function catalogArtwork(index: number): Uint8Array {
   if (!Number.isInteger(index) || index < 0 || index >= ART_COUNT) throw new Error('Неизвестная картина');
-  if (index < 3) return createScene(index);
+  if (index < 3) return colorArtwork(createScene(index));
   const cells = new Uint8Array(128 * 128).fill(2);
   const rect = (x:number,y:number,w:number,h:number,c:number) => {
     for(let py=Math.max(0,Math.floor(y));py<Math.min(128,y+h);py++) for(let px=Math.max(0,Math.floor(x));px<Math.min(128,x+w);px++)cells[py*128+px]=c;
@@ -126,5 +126,15 @@ export function catalogArtwork(index: number): Uint8Array {
     poly([[cx-2,base-42],[cx-29,base-18],[cx-35,base-26],[cx-5,base-47]],1);disk(cx,base-46,5,5,4);rect(cx-4,base-14,8,14,1);
   }
   flower(16,116);
+  return colorArtwork(cells);
+}
+
+// Add compact foreground accents in four extra colors without changing silhouettes.
+function colorArtwork(cells:Uint8Array):Uint8Array {
+  for(let color=1;color<=4;color++){
+    const region:number[]=[];
+    for(let i=0;i<cells.length;i++)if(cells[i]===color)region.push(i);
+    for(let i=region.length-Math.min(128,Math.floor(region.length/4));i<region.length;i++)cells[region[i]]=color+4;
+  }
   return cells;
 }

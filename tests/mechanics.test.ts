@@ -45,10 +45,33 @@ it('sends a linked pair as one turn, or the clicked bucket alone when one slot r
   expect(single.launch(1)).toBe('ok');expect(single.field[0]?.id).toBe(0);expect(single.mechanics.links).toHaveLength(0);expect(single.events[0].partnerId).toBeUndefined();
   expect(single.launch(0)).toBe('full');expect(single.turns).toBe(1);
 });
-it('keeps the chosen color on the belt and alternates only remaining buckets',()=>{
-  const game=new Game(fixture({0:{...bucket(0),alternate:2},1:bucket(1)}));
-  game.launch(1);advance(game);expect(game.field[0]?.color).toBe(2);
-  game.launch(0);advance(game);expect(game.buckets.find(b=>b.id===0)?.color).toBe(2);
+it('exchanges colors in equal-capacity pairs and freezes both when one leaves',()=>{
+  const game=new Game(fixture({0:{...bucket(0,1),swapWith:1},1:{...bucket(1,2),swapWith:0},2:bucket(2)}));
+  game.launch(2);advance(game);
+  expect(game.field[0]?.color).toBe(2);expect(game.field[1]?.color).toBe(1);
+  game.launch(0);advance(game);
+  expect(game.buckets.find(b=>b.id===0)?.color).toBe(2);
+  expect(game.field[1]?.color).toBe(1);expect(game.field[1]?.swapWith).toBeUndefined();
+});
+it('rejects orphan switches, unequal capacities and per-color sand mismatches',()=>{
+  expect(()=>new Game(fixture({0:{...bucket(0),swapWith:1}}))).toThrow();
+  expect(()=>new Game(fixture({0:{...bucket(0),swapWith:1},1:{...bucket(1,2,21),swapWith:0}}))).toThrow();
+  const level=fixture({0:{...bucket(0),swapWith:1},1:{...bucket(1,2),swapWith:0}});
+  level.cells[level.cells.length-1]=2;expect(()=>new Game(level)).toThrow();
+});
+it.each([0,1])('preserves each color through repeated exchanges and departure of partner %i',id=>{
+  const game=new Game(fixture({0:{...bucket(0,1),swapWith:1},1:{...bucket(1,2),swapWith:0},2:bucket(2,3),3:bucket(3,4)}));
+  const balanced=()=>{
+    for(let color=1;color<=8;color++){
+      const grains=game.cells.reduce((n,c)=>n+Number(c===color),0);
+      const capacity=game.field.reduce((n,b)=>n+(b?.color===color?b.capacity:0),0)+game.buckets.reduce((n,b)=>n+(b.color===color?b.capacity-b.filled:0),0);
+      expect(capacity).toBe(grains);
+    }
+  };
+  for(const other of [2,3]){game.launch(other);advance(game);balanced();}
+  expect(game.field[0]?.color).toBe(1);expect(game.field[1]?.color).toBe(2);
+  expect(game.launch(id)).toBe('ok');advance(game);balanced();
+  expect(game.field[1-id]?.swapWith).toBeUndefined();
 });
 it('holds covered grains until the matching key bucket fills, also opening its gate',()=>{
   const level=fixture({0:bucket(0,1,1),1:bucket(1,2,1)},l=>{
@@ -58,6 +81,9 @@ it('holds covered grains until the matching key bucket fills, also opening its g
   const game=new Game(level);advance(game,10);expect(game.cells[5*WIDTH+5]).toBe(2);
   game.launch(0);for(let i=0;i<400&&game.mechanics.lids.length;i++)game.step();
   expect(game.mechanics.lids).toHaveLength(0);expect(game.mechanics.gates).toHaveLength(0);expect(game.held[5*WIDTH+5]).toBe(0);
+  advance(game,HEIGHT);
+  expect(game.cells.slice(0,(HEIGHT-1)*WIDTH).some(Boolean)).toBe(false);
+  expect(game.cells.slice((HEIGHT-1)*WIDTH)).toContain(2);
 });
 it('rejects intersecting regions, missing keys and duplicate bucket IDs',()=>{
   const level=fixture({0:bucket(0),1:bucket(1),4:bucket(2),5:bucket(3)},l=>{l.mechanics!.trays=[[0,1,5,4]];l.mechanics!.queues=[{cell:0,buckets:[bucket(4)]}];});

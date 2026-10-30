@@ -87,10 +87,11 @@ function render(): void {
   } else if (mechanic === 6) {
     set(4, step ? '' : bucket(2, '◇'));
   } else {
-    set(4, colorSent === null ? `${bucket(alternatingColor(step), '↻')}<span class="next-color" style="background:${colors[alternatingColor(step+1)]}" aria-label="Следующий цвет"></span>` : '');
+    set(4, colorSent === null ? `${bucket(alternatingColor(step), '⇄')}<span class="next-color" style="background:${colors[alternatingColor(step+1)]}" aria-label="Следующий цвет"></span>` : '');
+    set(5, `${bucket(colorSent===null?alternatingColor(step+1):1-colorSent, colorSent===null?'⇄':'')}`);
     if (colorSent === null) controls.innerHTML = '<button data-send-color>Отправить текущее ведро</button>';
     root.querySelector('#advance')!.textContent = colorSent === null ? 'Отправить другое ведро → сменить цвет' : 'Ещё раз';
-    root.querySelector('#status')!.textContent = colorSent === null ? `Ход ${step} · сейчас ${alternatingColor(step) === 0 ? 'мятный' : 'коралловый'}, маленькая метка — следующий` : 'Ведро на ленте · цвет больше не меняется';
+    root.querySelector('#status')!.textContent = colorSent === null ? `Ход ${step} · сейчас ${alternatingColor(step) === 0 ? 'мятный' : 'коралловый'}, маленькая метка — следующий` : 'Одно ведро на ленте · оба цвета зафиксированы';
   }
   root.querySelectorAll<HTMLElement>('.belt i').forEach((slot,i) => {
     slot.innerHTML = step && i < (mechanic === 5 ? 2 : 1) && [0,2,3,4,5].includes(mechanic) ? bucket(i + step - 1) : '';

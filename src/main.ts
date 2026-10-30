@@ -1,3 +1,4 @@
+import { version } from '../package.json';
 import './style.css';
 import './interface.css';
 import './mechanics.css';
@@ -22,11 +23,11 @@ root.innerHTML=`<section id="menu" class="menu" aria-label="Главное ме�
 <header class="brand"><span class="brand-mark">${bucketIcon}</span><span>SAND BUCKET</span></header>
 <div class="intro"><span class="eyebrow">МАЛЕНЬКАЯ ПАУЗА</span><h1>Всё течёт.<br><span>Песок тоже.</span></h1><p>Новый узор. Знакомое спокойствие.</p></div>
 <div class="level-card"><div class="preview-wrap"><canvas id="preview" width="128" height="128" aria-hidden="true"></canvas><span id="menu-number" class="level-badge"></span></div><div class="level-description"><h2 id="menu-title"></h2><span id="menu-difficulty" class="level-state"></span></div></div>
-<button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p></section>
+<button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p><footer class="app-version">v${version}</footer></section>
 <section id="game" class="mock-game" hidden aria-label="Игра">
 <header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span id="level-number" class="mock-brand"></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
-<div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div>
-<div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
+<div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span></div>
+<div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div><div class="belt-row"><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
@@ -38,7 +39,7 @@ let game=new Game(asLevel(record));
 let initialized=false,loading=false,visible=false,paused=false,finished=false,wonSaved=false;
 let accumulator=0, speed:Speed=progress.data.speed, lastPercent=-1,lastCount=-1;
 const fieldView=new FieldView(el('field'),el('sand'));
-const shownMechanics=new Set<number>();
+const shownMechanics=new Set(progress.data.seenMechanics);
 function storageNote():void {if(!progress.available)el('offline-note').textContent='Браузер не разрешает сохранять прогресс.';}
 function menu():void {
   el('menu-number').textContent=String(progress.data.number);
@@ -55,12 +56,12 @@ function setSpeed(value:Speed):void {
 }
 function updateField():void { fieldView.draw(game); }
 function buildField():void { fieldView.reset(game); }
-function explainMechanics():void {
-  const kinds=record.kinds??[];
+function explainMechanics(onlyNew=false):void {
+  const kinds=[...new Set(record.kinds??[])].filter(k=>!onlyNew||!shownMechanics.has(k));
   if(!kinds.length)return;
   paused=true;sand.app.ticker.stop();
   dialog('Новый ход',kinds.map(k=>MECHANIC_HINTS[k]).join(' '),'Играть',()=>{paused=false;el('overlay').hidden=true;accumulator=0;sand.app.ticker.start();});
-  kinds.forEach(k=>shownMechanics.add(k));
+  kinds.forEach(k=>shownMechanics.add(k));progress.markMechanicsSeen(kinds);storageNote();
 }
 function hud():void {
   const percent=Math.floor(game.collected/game.total*100),count=game.slots.reduce((n,b)=>n+Number(Boolean(b)),0);
@@ -71,7 +72,7 @@ function reset():void {
   game=new Game(lossScenario?createLossScenario():asLevel(record));accumulator=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
   root.style.setProperty('--columns',String(game.columns));el('overlay').hidden=true;
   el('level-number').textContent=`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=lossScenario?'Проверка проигрыша':DIFFICULTIES[difficulty(record.number)];
-  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0);hud();sand.app.ticker.start();
+  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0,speed);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
   el('overlay').classList.toggle('is-win',game.status==='won');
@@ -92,9 +93,9 @@ async function start():Promise<void> {
       await sand.init(el('sand'));initialized=true;
       sand.app.ticker.add(ticker=>{
         if(!visible||paused||document.hidden){accumulator=0;return;}
-        const dt=Math.min(ticker.deltaMS/1000,.1)*speed;
+        const dt=Math.min(ticker.deltaMS/1000,.1);
         accumulator=advanceFrame(game,ticker.deltaMS/1000,speed,accumulator);
-        sand.draw(game);belt.draw(game,dt);updateField();el('field').classList.toggle('is-changing',game.tick<game.busyUntil);hud();
+        sand.draw(game);belt.draw(game,dt,speed);updateField();el('field').classList.toggle('is-changing',game.motionTick<game.busyUntil);hud();
         if(game.status==='won'&&!wonSaved){wonSaved=true;el<HTMLButtonElement>('restart').disabled=true;if(devLevel)devLevel++;else if(!lossScenario)progress.advance();menu();}
         if(game.status!=='playing'&&!finished&&(game.status==='lost'||!belt.busy)){
           finished=true;sand.app.ticker.stop();
@@ -108,7 +109,7 @@ async function start():Promise<void> {
     }
     visible=true;el('menu').hidden=true;el('game').hidden=false;root.classList.add('playing');reset();el('restart').focus();
     el('sand').setAttribute('aria-label',ART_TITLES[record.art??0]);
-    if(!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics();
+    if(!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics(true);
     void loader.get((devLevel||progress.data.number)+1);
   } catch(error){
     console.error(error);el('offline-note').textContent='Не удалось запустить игру. Обнови страницу.';
@@ -128,7 +129,7 @@ el('play').addEventListener('click',()=>void start());el('home').addEventListene
 el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing')reset();});
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
 el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
-window.addEventListener('resize',()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0);}});
+window.addEventListener('resize',()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape')pause();

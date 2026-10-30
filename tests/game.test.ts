@@ -64,16 +64,17 @@ describe('simulation', () => {
     expect(new Game(level).collected).toBe(0);expect(level.cells).toEqual(createLevel().cells);
   });
   it('rejects malformed cells, capacities, IDs, dimensions and wall overlaps', () => {
-    const level=createLevel();level.field[0]!.capacity++;
+    const level=createLevel();level.field.find(b=>b)!.capacity++;
     expect(()=>new Game(level)).toThrow();
     expect(()=>new Game({...createLevel(),columns:8})).toThrow();
-    expect(()=>new Game({...createLevel(),walls:[0]})).toThrow();
-    const duplicate=createLevel();duplicate.field[1]!.id=duplicate.field[0]!.id;expect(()=>new Game(duplicate)).toThrow();
+    const overlapping=createLevel();overlapping.walls=[overlapping.field.findIndex(b=>b!==null)];
+    expect(()=>new Game(overlapping)).toThrow();
+    const duplicate=createLevel(),buckets=duplicate.field.filter(b=>b!==null);buckets[1].id=buckets[0].id;expect(()=>new Game(duplicate)).toThrow();
   });
-  it('×2 uses identical steps and events for the same simulation-time actions', () => {
-    const a=new Game(createLevel()),b=new Game(createLevel());const id=a.field[0]!.id;a.launch(id);b.launch(id);
+  it('executes the same physics steps at equal simulation time', () => {
+    const a=new Game(createLevel()),b=new Game(createLevel());
     let ra=0,rb=0;for(let i=0;i<1000;i++){ra=advanceFrame(a,1/60,1,ra);rb=advanceFrame(b,1/120,2,rb);}
-    expect(a.cells).toEqual(b.cells);expect(a.events).toEqual(b.events);expect(a.slots).toEqual(b.slots);
+    expect(a.cells).toEqual(b.cells);expect(a.tick).toBe(b.tick);expect(a.motionTick).toBe(b.motionTick*2);
   });
 });
 
@@ -87,6 +88,20 @@ it('waits for distant matching grains and for sand still falling',()=>{
     run(game,LAUNCH_TICKS);expect(game.status).toBe('playing');
     run(game,LOOP_TICKS+HEIGHT);expect(game.status).toBe('won');
   }
+});
+it('wakes settled rows when collection removes the supporting sand',()=>{
+  const cells=new Uint8Array(WIDTH*HEIGHT);
+  cells[64]=1;cells.fill(2,(HEIGHT-1)*WIDTH);
+  const field=Array<BucketSpec|null>(16).fill(null);
+  field[0]={id:0,color:2,capacity:WIDTH};field[1]={id:1,color:1,capacity:1};
+  const game=new Game({cells,field});run(game,HEIGHT*2);
+  expect(game.cells.slice((HEIGHT-2)*WIDTH,(HEIGHT-1)*WIDTH)).toContain(1);
+  game.launch(0);run(game,LOOP_TICKS+LAUNCH_TICKS+HEIGHT);
+  expect(game.collected).toBe(WIDTH);
+  expect(game.cells.slice(0,(HEIGHT-1)*WIDTH).some(Boolean)).toBe(false);
+  expect(game.cells.slice((HEIGHT-1)*WIDTH)).toContain(1);
+  game.launch(1);run(game,LOOP_TICKS+LAUNCH_TICKS);
+  expect(game.status).toBe('won');
 });
 it('does not count sand held under a lid as collectable',()=>{
   const cells=new Uint8Array(WIDTH*HEIGHT);cells.fill(1);

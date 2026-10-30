@@ -1,6 +1,6 @@
 import { bucketPosition, landingMotion } from './bucket-motion';
 import { bucketIcon } from './bucket-icon';
-import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent } from './game';
+import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent, type Speed } from './game';
 
 export class BeltView {
   private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number }[][] = [];
@@ -12,6 +12,7 @@ export class BeltView {
   private sandRect!: DOMRect;
   private streamTop = 0;
   private clock = 0;
+  private sandClock = 0;
   private beltRect!: DOMRect;
   private cells: {x:number;y:number}[] = [];
   private grainSize = 32;
@@ -49,14 +50,14 @@ export class BeltView {
   }
   reset(): void { this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.rope.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
-  draw(game: Game, seconds: number): void {
-    this.clock+=seconds;
+  draw(game: Game, seconds: number, speed:Speed=1): void {
+    this.clock+=seconds*2;this.sandClock+=seconds*speed;
     for(const event of game.events) {
       if(event.type==='arrive')continue;
       if(event.type==='collect') {
         for(let i=0;i<Math.min(3,event.amount!);i++) {
           const grain=this.grains[this.nextGrain++%this.grains.length];
-          Object.assign(grain,{active:true,born:this.clock-i*.025,x:this.sandRect.left+4+event.from!.x*(this.sandRect.width-8)-this.beltRect.left,
+          Object.assign(grain,{active:true,born:this.sandClock-i*.025,x:this.sandRect.left+4+event.from!.x*(this.sandRect.width-8)-this.beltRect.left,
             y:this.sandRect.top+4+event.from!.y*(this.sandRect.height-8)-this.streamTop,slot:event.slot,color:event.bucket.color,jitter:(i-1)*3});
         }
         continue;
@@ -71,7 +72,7 @@ export class BeltView {
     game.events.length=0;
     for(let slot=0;slot<BELT_LIMIT;slot++) {
       const position=game.slotPosition(slot),bucket=game.slots[slot];
-      const visible=bucket!==null&&game.tick>=bucket.arrivalTick;
+      const visible=bucket!==null&&game.motionTick>=bucket.arrivalTick;
       const percent=bucket?Math.floor(bucket.filled/bucket.capacity*100):0;
       for(let fragment=0;fragment<2;fragment++) {
         const view=this.views[slot][fragment];
@@ -79,7 +80,7 @@ export class BeltView {
         view.slot.style.transform=`translateX(${x-27}px)`;
         view.bucket.hidden=!visible;
         if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=game.palette[bucket.color];}
-        const settle=this.reduced.matches||!bucket?0:landingMotion((game.tick-bucket.arrivalTick)/16);
+        const settle=this.reduced.matches||!bucket?0:landingMotion((game.motionTick-bucket.arrivalTick)/16);
         view.bucket.style.transform=`translateY(${settle*5}px) scale(${1+settle*.09},${1-settle*.1})`;
         if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
       }
@@ -88,7 +89,7 @@ export class BeltView {
     ctx.clearRect(0,0,this.stream.width,this.stream.height);
     for(const grain of this.grains) {
       if(!grain.active)continue;
-      const t=(this.clock-grain.born)/.22;
+      const t=(this.sandClock-grain.born)/.22;
       if(t>=1){grain.active=false;continue;}
       const targetX=game.slotPosition(grain.slot)*this.beltRect.width;
       const targetY=this.beltRect.top+25-this.streamTop;
@@ -101,7 +102,7 @@ export class BeltView {
     for(const effect of this.effects) {
       if(!effect.active)continue;
       const event=effect.event!,complete=event.type==='complete';
-      const t=complete?Math.min((this.clock-effect.started)/.8,1):Math.min((game.tick-event.tick)/LAUNCH_TICKS,1);
+      const t=complete?Math.min((this.clock-effect.started)/.8,1):Math.min((game.motionTick-event.motionTick!)/LAUNCH_TICKS,1);
       const end={x:this.beltRect.left+game.slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34};
       let x=end.x,y=end.y,scale=1,scaleY=1,angle=0,opacity=1;
       if(complete){
