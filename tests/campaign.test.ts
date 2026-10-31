@@ -40,3 +40,18 @@ it('merges accent sand and all bucket sources without changing capacities or the
     expect(() => new Game(level)).not.toThrow();
   }
 });
+
+it('starts swap pairs apart with one accessible bucket and one deeper blocked partner',()=>{
+  for(let number=1;number<=400;number++){
+    const level=playableLevel(campaignLevel(number)),game=new Game(level);
+    for(const [i,bucket] of level.field.entries())if(bucket?.swapWith!==undefined){
+      const j=level.field.findIndex(other=>other?.id===bucket.swapWith);
+      if(j<i)continue;
+      expect(game.paths.has(i), 'upper partner in level '+number).toBe(true);
+      expect(game.paths.has(j), 'lower partner in level '+number).toBe(false);
+      const rows=Math.floor(j/game.columns)-Math.floor(i/game.columns);
+      expect(rows).toBeGreaterThan(0);
+      expect(Math.max(rows,Math.abs(i%game.columns-j%game.columns))).toBeGreaterThan(1);
+    }
+  }
+});

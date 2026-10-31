@@ -19,6 +19,7 @@
     "campaign:verify-playable": "node --experimental-strip-types scripts/prepare-campaign.ts --verify-playable",
     "check:version": "node --experimental-strip-types scripts/check-version.ts",
     "campaign:verify": "node --experimental-strip-types scripts/prepare-campaign.ts --verify",
+    "campaign:refresh-swaps": "node --experimental-strip-types scripts/prepare-campaign.ts --refresh-swaps",
     "campaign:rebalance": "node --experimental-strip-types scripts/prepare-campaign.ts --rebalance-capacities"
   },
   "dependencies": {

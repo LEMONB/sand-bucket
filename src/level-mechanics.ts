@@ -1,5 +1,10 @@
 import { emptyMechanics, type Mechanics } from './mechanics.ts';
-import type { BucketSpec } from './game.ts';
+import { exitPaths, type BucketSpec } from './game.ts';
+
+export function separatedSwapCells(a:number,b:number,columns:number,accessible:ReadonlySet<number>):boolean {
+  const upper=Math.floor(a/columns),lower=Math.floor(b/columns);
+  return lower>upper && Math.max(Math.abs(a%columns-b%columns),lower-upper)>1 && accessible.has(a) && !accessible.has(b);
+}
 
 export function mechanicsFor(number: number,columns=4): number[] {
   if(number<=8)return number===5?[]:[number-1];
@@ -53,16 +58,22 @@ export function arrangeMechanics(specs: BucketSpec[], order: number[], columns: 
     mechanics.lids.push({x:8+(n%2)*64,y:8+Math.floor(n/2)*40,width:40,height:28,key});
   }
   for(let n=0;n<kinds.filter(k=>k===7).length;n++){
+    const accessible=new Set(exitPaths(field,columns,blocked).keys());
     const all=[...field,...mechanics.queues.flatMap(q=>q.buckets),...mechanics.platforms.flatMap(p=>p.next)].filter((b):b is BucketSpec=>b!==null);
     const available=ordinary.filter(i=>field[i]!.swapWith===undefined);
-    const pairs=available.flatMap(i=>available.filter(j=>j>i&&Math.floor(i/columns)===Math.floor(j/columns)&&field[i]!.color!==field[j]!.color).map(j=>[i,j])).filter(([i,j])=>{
+    const pairs=available.filter(i=>accessible.has(i)).flatMap(i=>available.filter(j=>i!==j&&field[i]!.color!==field[j]!.color).flatMap(j=>{
+      const destinations=separatedSwapCells(i,j,columns,accessible)?[j]:available.filter(k=>separatedSwapCells(i,k,columns,accessible));
+      return destinations.map(k=>[i,j,k]);
+    })).filter(([i,j])=>{
       const a=field[i]!,b=field[j]!,larger=a.capacity>b.capacity?a:b;
       return a.capacity===b.capacity||all.some(other=>other.id!==larger.id&&other.color===larger.color&&other.swapWith===undefined);
     });
     if(!pairs.length)throw Error('Нет сбалансированной пары переключателей');
     const difference=([i,j]:number[])=>Math.abs(field[i]!.capacity-field[j]!.capacity);
     const closest=Math.min(...pairs.map(difference)),balanced=pairs.filter(pair=>difference(pair)===closest);
-    const [i,j]=balanced[Math.floor(random()*balanced.length)],a=field[i]!,b=field[j]!;
+    const [i,j,destination]=balanced[Math.floor(random()*balanced.length)];
+    [field[j],field[destination]]=[field[destination],field[j]];
+    const a=field[i]!,b=field[destination]!;
     if(a.capacity!==b.capacity){
       const larger=a.capacity>b.capacity?a:b,smaller=larger===a?b:a;
       const receiver=all.find(other=>other.id!==larger.id&&other.color===larger.color&&other.swapWith===undefined)!;
