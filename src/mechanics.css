@@ -42,7 +42,6 @@
 .yoke-grain { stroke: #89613c; stroke-width: 1; opacity: .55; }
 .flying-yoke { position: fixed; z-index: 29; }
 .belt-marks .bucket-roles { right: -7px; top: 0; }
-.bucket-roles .swap-number { position: static; font: 8px/1 system-ui; text-align: center; color: #385b50; }
 
 .queue-dispenser { position: absolute; inset: 2px; border: 1px solid #8fa799; border-radius: 8px; background: linear-gradient(#c2d0c4 0 16px, #e3e9dc 16px); box-shadow: inset 0 -3px #aabdab; }
 .queue-dispenser::before { content: ''; position: absolute; inset: 17px 5px 5px; border-radius: 3px; background: #b6c7b6; box-shadow: inset 0 2px 2px #59796830; }

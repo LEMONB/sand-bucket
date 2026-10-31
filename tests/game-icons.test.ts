@@ -24,3 +24,10 @@ it('does not expose a hidden swap partner through its arrow color', () => {
   expect(bucketMarks(game, bucket)).toContain('icon-swap');
   expect(bucketMarks(game, bucket)).not.toContain(game.palette[1]);
 });
+
+it('shows swap arrows without exposing numeric bucket identifiers', () => {
+  const game = fixture(), bucket = { ...game.field[15]!, swapWith: 14 };
+  const marks = bucketMarks(game, bucket);
+  expect(marks).toContain('icon-swap');
+  expect(marks.replace(/<[^>]*>/g, '')).toBe('');
+});
