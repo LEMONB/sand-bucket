@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sand Bucket — варианты компоновки</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #e7e9e2; color: #25413e; font: 14px/1.5 system-ui, sans-serif; }
+  h1 { margin: 0 0 8px; font-size: 25px; }
+  body > p { max-width: 850px; margin: 0 0 24px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 410px), 1fr)); gap: 28px; align-items: start; }
+  article { min-width: 0; }
+  h2 { margin: 0 0 6px; font-size: 18px; }
+  .metrics { min-height: 48px; margin: 0 0 12px; }
+  .warning { color: #9b4a26; font-weight: 650; }
+  .mount { position: relative; margin: auto; }
+  .phone { position: absolute; left: 0; top: 0; width: var(--w); height: var(--h); transform-origin: top left; background: #f5f1e9; border-radius: 26px; box-shadow: 0 6px 22px #25413e25; }
+  .wall-layer { position: absolute; inset: 0; pointer-events: none; border-radius: 26px; overflow: hidden; }
+  .safe-top { position: relative; height: var(--top); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 12px; font-weight: 700; }
+  .game { position: relative; height: calc(100% - var(--top) - var(--bottom)); margin: 0 12px; display: flex; flex-direction: column; }
+  .header { height: 44px; flex: none; display: flex; align-items: center; gap: 20px; }
+  .nav { font-size: 27px; }
+  .level { font-size: 10px; font-weight: 750; letter-spacing: 1px; }
+  .help { margin-left: auto; font-size: 11px; }
+  .status { height: 28px; flex: none; display: flex; gap: 10px; align-items: center; font-size: 10px; }
+  .progress { height: 4px; flex: 1; background: #dfe4d5; border-radius: 4px; }
+  .speed { position: absolute; left: 50%; top: calc(100% - 24px); transform: translateX(-50%); width: 96px; height: 44px; padding: 0; border: 0; background: transparent; color: #36554a; font: 700 11px system-ui; cursor: pointer; }
+  .speed-shape { position: absolute; left: 0; top: 22px; width: 96px; height: 22px; fill: #d8ded5; pointer-events: none; }
+  .speed-label { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); padding: 0 12px; line-height: 16px; border-radius: 8px; }
+  .speed[aria-pressed="true"] .speed-label { color: #fffaf2; background: #315c4d; }
+  .speed:focus-visible { outline: 2px solid #328a80; outline-offset: 2px; border-radius: 12px; }
+  .sand { width: 100%; aspect-ratio: 1; flex: none; display: block; border: 4px solid #fffaf2; outline: 1px solid #deded2; border-radius: 8px; image-rendering: pixelated; }
+  .belt { position: relative; height: var(--belt-height, 44px); flex: none; margin: 10px 0 30px; padding: 3px 8px; display: flex; justify-content: space-around; gap: 8px; background: #d8ded5; border-radius: 12px; }
+  .slot { width: calc(var(--belt-height, 44px) - 6px); border: 2px solid #b6c4b6; border-radius: 9px; background: #c7d2c3; }
+  .level-info { display: flex; flex-direction: column; gap: 2px; }
+  .notice { display: flex; align-items: center; gap: 4px; color: #6a7862; font-size: 9px; line-height: 12px; white-space: nowrap; }
+  .notice::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #69aa91; }
+  .space { flex: 1; min-height: 0; display: grid; place-items: center; }
+  .field-frame { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .side-wall { background: transparent; }
+  .side-wall:first-child { margin-left: -12px; border-top-right-radius: 12px; }
+  .side-wall:last-child { margin-right: -12px; border-top-left-radius: 12px; }
+  .field { display: grid; gap: 2px; padding: 6px; }
+  .cell { aspect-ratio: 1; display: grid; place-items: center; min-width: 0; min-height: 0; }
+  .cell svg { width: 80%; height: 80%; }
+  .wall { position: relative; aspect-ratio: auto; background: transparent; border-radius: 4px; margin: 3px; }
+  .wall.join-left { margin-left: -6px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .wall.join-right { margin-right: -6px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .wall.join-bottom { margin-bottom: -6px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .empty::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #ced8c5; }
+  .home { position: absolute; bottom: 8px; left: 35%; width: 30%; height: 5px; border-radius: 4px; background: #25413e; }
+  @media(max-width: 480px) { body { padding: 16px; } }
+</style>
+<h1>Большой песок и широкие сетки</h1>
+<p>Визуальные макеты, не реальные уровни. Песок на всю ширину с отступами 12 px, лента уменьшается под размер вёдер, переключатель скорости выступает снизу. Сетка окружена декоративными стенами по бокам и снизу; стены продолжаются до краёв экрана. Сетка уменьшается целиком; ячейки остаются квадратными. Размеры указаны в CSS px до масштабирования превью. Оранжевым отмечены ячейки меньше 35 px.</p>
+<main></main>
+<script type="module">
+  import { catalogArtwork, artworkPalette } from '/src/art-catalog.ts';
+  import { bucketIcon } from '/src/bucket-icon.ts';
+  const cases = [
+    ['iPhone X · небольшая сетка', 375, 812, 44, 34, 6, 3, false],
+    ['iPhone 15 Pro · средняя сетка', 393, 852, 59, 34, 7, 4, false],
+    ['Pro Max · большая сетка', 440, 956, 62, 34, 8, 5, false],
+    ['iPhone X · максимальная плотность', 375, 812, 44, 34, 9, 6, false],
+    ['iPhone 15 Pro · максимальная плотность', 393, 852, 59, 34, 9, 6, false],
+    ['iPhone X · обновление + плотная сетка', 375, 812, 44, 34, 9, 6, true],
+    ['iPhone 15 Pro · обновление + плотная сетка', 393, 852, 59, 34, 9, 6, true],
+    ['iPhone SE · низкий экран', 375, 667, 20, 8, 9, 6, false],
+  ];
+  const pixels = catalogArtwork(73), palette = artworkPalette(73);
+  for (const [index,[name,w,h,top,bottom,columns,rows,notice]] of cases.entries()) {
+    const article = document.createElement('article');
+    article.innerHTML = `<h2>${name}</h2><p class="metrics"></p><div class="mount"><div class="phone" style="--w:${w}px;--h:${h}px;--top:${top}px;--bottom:${bottom}px"><svg class="wall-layer" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><defs><filter id="round-walls-${index}" filterUnits="userSpaceOnUse" x="-20" y="-20" width="${w+40}" height="${h+40}" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="4"/><feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -9"/></filter></defs><rect class="field-ground" fill="#eeeee3"/><g class="wall-paint" fill="#82988b" filter="url(#round-walls-${index})"></g></svg><div class="safe-top"><span>9:41</span><span>▮▮▮ ▰</span></div><div class="game"><div class="header"><span class="nav">↻</span><span class="nav">‹</span><span class="level-info"><span class="level">ПРИМЕР</span>${notice ? '<span class="notice" role="status">Обновление готово</span>' : ''}</span><span class="help">Испытание ⓘ</span></div><div class="status"><span>0%</span><span class="progress"></span><span>0 / 5</span></div><canvas class="sand" width="128" height="128" aria-label="Поле песка"></canvas><div class="belt">${'<span class="slot"></span>'.repeat(5)}<button class="speed" type="button" aria-label="Ускорить в два раза" aria-pressed="false"><svg class="speed-shape" viewBox="0 0 96 22" aria-hidden="true"><path d="M0 0C16 0 12 20 30 20H66C84 20 80 0 96 0Z"/></svg><span class="speed-label">×1</span></button></div><div class="space"><div class="field-frame"><div class="side-wall" aria-hidden="true"></div><div class="field"></div><div class="side-wall" aria-hidden="true"></div></div></div></div>${bottom > 8 ? '<div class="home"></div>' : ''}</div></div>`;
+    document.querySelector('main').append(article);
+    const speed=article.querySelector('.speed');
+    speed.addEventListener('click',()=>{
+      const fast=speed.getAttribute('aria-pressed')!=='true';
+      speed.setAttribute('aria-pressed',String(fast));speed.querySelector('.speed-label').textContent=fast?'×2':'×1';
+      speed.setAttribute('aria-label',fast?'Вернуть обычную скорость':'Ускорить в два раза');
+    });
+    if(w===393&&!notice)speed.click();
+    const canvas = article.querySelector('canvas'), context = canvas.getContext('2d');
+    pixels.forEach((color,i) => { context.fillStyle=palette[color>4?color-4:color]; context.fillRect(i%128,Math.floor(i/128),1,1); });
+    const field = article.querySelector('.field'), space = article.querySelector('.space');
+    field.style.gridTemplateColumns=`repeat(${columns}, minmax(0, 1fr))`;
+    field.style.gridTemplateRows=`repeat(${rows}, minmax(0, 1fr))`;
+    field.innerHTML=Array.from({length:columns*rows},(_,i)=>`<div class="cell ${i%13===9?`wall ${i%columns===0?'join-left':''} ${i%columns===columns-1?'join-right':''} ${Math.floor(i/columns)===rows-1?'join-bottom':''}`:i%11===8?'empty':''}" style="color:${palette[i%4+1]}">${i%13===9||i%11===8?'':bucketIcon}</div>`).join('');
+    const layout = () => {
+      const scale=Math.min(1,article.clientWidth/w), mount=article.querySelector('.mount');
+      mount.style.width=`${w*scale}px`; mount.style.height=`${h*scale}px`;
+      article.querySelector('.phone').style.transform=`scale(${scale})`;
+      const phone=article.querySelector('.phone'), frame=article.querySelector('.field-frame');
+      const available=space.clientHeight+article.querySelector('.belt').offsetHeight;
+      const widthLimit=(space.clientWidth-12-(columns-1)*2)/columns;
+      // Solve once for a belt proportional to the bucket drawing (80% of a cell).
+      const fixedCell=(available-44-12-(rows-1)*2)/rows;
+      const adaptiveCell=(available-8-12-(rows-1)*2)/(rows+.8);
+      const cell=Math.max(0,Math.min(widthLimit,fixedCell*.8+8>=44?fixedCell:adaptiveCell));
+      const beltHeight=Math.min(44,cell*.8+8);
+      phone.style.setProperty('--belt-height',beltHeight+'px');
+      field.style.width=`${columns*cell+(columns-1)*2+12}px`; field.style.height=`${rows*cell+(rows-1)*2+12}px`;
+      const origin=phone.getBoundingClientRect();
+      const box=element=>{const r=element.getBoundingClientRect();return {x:(r.left-origin.left)/scale,y:(r.top-origin.top)/scale,w:r.width/scale,h:r.height/scale};};
+      const bounds=box(field), ground=article.querySelector('.field-ground');
+      for(const [key,value] of Object.entries({x:bounds.x,y:bounds.y,width:bounds.w,height:bounds.h}))ground.setAttribute(key,String(value));
+      const {x,y,w:fw,h:fh}=bounds;
+      // Round the union so adjoining walls get the same soft corners as isolated blocks.
+      article.querySelector('.wall-paint').innerHTML=`<path fill-rule="evenodd" d="M-20 ${y}H${w+20}V${h+20}H-20Z M${x} ${y}H${x+fw}V${y+fh}H${x}Z"/>`+
+        [...field.querySelectorAll('.wall')].map(element=>{const r=box(element);return `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`;}).join('');
+      article.querySelector('feGaussianBlur').setAttribute('stdDeviation',String(Math.min(4,cell*.15)));
+      const metrics=article.querySelector('.metrics');
+      metrics.innerHTML=`Экран ${w}×${h} · песок ${w-24}×${w-24} · сетка ${columns}×${rows}<br>Лента ${beltHeight.toFixed(1)} px · <span class="${cell<35?'warning':''}">Ячейка ${cell.toFixed(1)}×${cell.toFixed(1)} px${cell<35?' — меньше 35 px':''}</span>`;
+    };
+    window.addEventListener('resize',layout);
+    layout();
+  }
+</script>
+</html>

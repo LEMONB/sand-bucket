@@ -2,6 +2,7 @@ import { version } from '../package.json';
 import './style.css';
 import './interface.css';
 import './mechanics.css';
+import { layoutGame } from './game-layout';
 import { FieldView } from './field-view';
 import { ART_TITLES } from './art-catalog';
 import { MECHANIC_HINTS } from './mechanic-help';
@@ -21,17 +22,16 @@ let storage: Pick<Storage,'getItem'|'setItem'>;
 try { storage=localStorage; } catch { storage={getItem(){throw Error();},setItem(){throw Error();}}; }
 const progress=new ProgressStore(storage);
 const root=document.querySelector<HTMLDivElement>('#app')!;
-function sizeBelt():void {root.style.setProperty('--belt-scale',String(Math.max(.75,Math.min(1,window.innerHeight/760))));}
-sizeBelt();
-root.innerHTML=`<p id="update-note" class="update-note" role="status" hidden>Обновление готово. Применится при переходе в меню или запуске уровня.</p><section id="menu" class="menu" aria-label="Главное меню">
+
+root.innerHTML=`<section id="menu" class="menu" aria-label="Главное меню">
 <header class="brand"><span class="brand-mark">${bucketIcon}</span><span>SAND BUCKET</span></header>
 <div class="intro"><span class="eyebrow">МАЛЕНЬКАЯ ПАУЗА</span><h1>Всё течёт.<br><span>Песок тоже.</span></h1><p>Новый узор. Знакомое спокойствие.</p></div>
 <div class="level-card"><div class="preview-wrap"><canvas id="preview" width="128" height="128" aria-hidden="true"></canvas><span id="menu-number" class="level-badge"></span></div><div class="level-description"><h2 id="menu-title"></h2><span id="menu-difficulty" class="level-state"></span></div></div>
-<label class="level-picker">Выбрать уровень <select id="level-select" aria-label="Выбрать доступный уровень"></select></label><button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p><footer class="app-version">v${version}</footer></section>
-<section id="game" class="mock-game" hidden aria-label="Игра">
-<header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span id="level-number" class="mock-brand"></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
+<label class="level-picker">Выбрать уровень <select id="level-select" aria-label="Выбрать доступный уровень"></select></label><button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p><footer class="app-version">v${version}<span id="menu-update-note" class="update-note" role="status" hidden>Обновление готово</span></footer></section>
+<svg id="field-walls" aria-hidden="true"><defs><filter id="round-field-walls" filterUnits="userSpaceOnUse" x="-20" y="-20" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="4"/><feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -9"/></filter></defs><rect fill="#eeeee3"/><g fill="#82988b" filter="url(#round-field-walls)"/></svg><section id="game" class="mock-game" hidden aria-label="Игра">
+<header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span class="level-info"><span id="level-number" class="mock-brand"></span><span id="update-note" class="update-note" role="status" hidden>Обновление готово</span></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
 <div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span></div>
-<div class="sand-space"><div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div></div><div class="belt-row"><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
+<div class="sand-space"><div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div></div><div class="belt-row"><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><svg class="speed-shape" viewBox="0 0 96 22" aria-hidden="true"><path d="M0 0C16 0 12 20 30 20H66C84 20 80 0 96 0Z"/></svg><span>×1</span></button></div><div id="field-space"><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div></div><span id="hint" class="sr-only" role="status"></span>
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
@@ -68,7 +68,7 @@ function menu():void {
 
 function setSpeed(value:Speed):void {
   speed=value;if(!puzzleScenario)progress.setSpeed(value);
-  const button=el('demo-speed');button.firstElementChild!.textContent=`×${value}`;button.setAttribute('aria-pressed',String(value===2));
+  const button=el('demo-speed');button.querySelector('span')!.textContent=`×${value}`;button.setAttribute('aria-pressed',String(value===2));
   button.setAttribute('aria-label',value===1?'Ускорить в два раза':'Вернуть обычную скорость');storageNote();
 }
 function updateField():void { fieldView.draw(game); }
@@ -93,9 +93,9 @@ function hud():void {
 function reset():void {
   if(updates?.apply({level:record.number,play:true}))return;
   game=new Game(puzzleScenario?createPuzzleScenario(puzzleScenario):lossScenario?createLossScenario():playableLevel(record));accumulator=0;lossElapsed=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
-  root.style.setProperty('--columns',String(game.columns));el('overlay').hidden=true;
+  root.style.setProperty('--columns',String(game.columns));root.style.setProperty('--rows',String(game.rows));el('overlay').hidden=true;
   el('level-number').textContent=puzzleScenario?PUZZLE_TITLES[puzzleScenario]:`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=puzzleScenario?'Образец':lossScenario?'Проверка проигрыша':CAMPAIGN_DIFFICULTIES[campaignPhase(record.number)];
-  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0,speed);hud();sand.app.ticker.start();
+  el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();layoutGame(root,game);buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0,speed);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
   el('overlay').classList.toggle('is-win',game.status==='won');
@@ -165,8 +165,7 @@ el('play').addEventListener('click',()=>void start());el('home').addEventListene
 el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing')reset();});
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
 el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
-window.addEventListener('resize',sizeBelt);
-new ResizeObserver(()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}}).observe(el('game'));
+new ResizeObserver(()=>{if(visible){layoutGame(root,game);fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}}).observe(el('game'));
 window.addEventListener('scroll',()=>{if(visible){belt.measure();belt.draw(game,0,speed);}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{
@@ -181,7 +180,7 @@ setSpeed(speed);menu();
 if(import.meta.env.PROD){
   updates=new GameUpdates(()=>!visible&&!loading?{level:selectedLevel,play:false}:null,resume.attempted,text=>{
     if(progress.available)el('offline-note').textContent=text;
-  },ready=>{ el('update-note').hidden=!ready; });
+  },ready=>{ el('update-note').hidden=!ready;el('menu-update-note').hidden=!ready; });
   void updates.start();
 }
 if(puzzleScenario||lossScenario||devLevel||resume.destination?.play)void start();

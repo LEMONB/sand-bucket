@@ -12,12 +12,12 @@ export function mechanicsFor(number: number,columns=4): number[] {
   return kinds.filter(kind=>kind!==4);
 }
 
-export function arrangeMechanics(specs: BucketSpec[], order: number[], columns: number, kinds: number[], random:()=>number,walls:ReadonlySet<number>=new Set()): {field:(BucketSpec|null)[]; mechanics:Mechanics} {
-  const field=Array<BucketSpec|null>(columns**2).fill(null),mechanics=emptyMechanics();
+export function arrangeMechanics(specs: BucketSpec[], order: number[], columns: number, kinds: number[], random:()=>number,walls:ReadonlySet<number>=new Set(),rows=columns): {field:(BucketSpec|null)[]; mechanics:Mechanics} {
+  const field=Array<BucketSpec|null>(columns*rows).fill(null),mechanics=emptyMechanics();
   const used=new Set<number>(walls),blocked=new Set<number>(walls),required=new Set<number>();
   const pick=(values:number[])=>{if(!values.length)throw Error('Нет места механике');return values[Math.floor(random()*values.length)];};
   const region=(width:number,height:number)=>{
-    const starts=Array.from({length:field.length},(_,i)=>i).filter(i=>i%columns+width<=columns&&Math.floor(i/columns)+height<=columns);
+    const starts=Array.from({length:field.length},(_,i)=>i).filter(i=>i%columns+width<=columns&&Math.floor(i/columns)+height<=rows);
     const cells=(a:number)=>Array.from({length:width*height},(_,j)=>a+Math.floor(j/width)*columns+j%width);
     const result=cells(pick(starts.filter(a=>cells(a).every(i=>!used.has(i)))));
     result.forEach(i=>used.add(i));return result;

@@ -76,6 +76,7 @@ export function accessibleCells(field: readonly (BucketSpec | null)[], columns =
 
 export class Game {
   readonly columns: number;
+  readonly rows: number;
   readonly walls: Set<number>;
   readonly mechanics: Mechanics;
   readonly palette: string[];
@@ -101,12 +102,13 @@ export class Game {
 
   constructor(level: Level) {
     this.columns = level.columns ?? FIELD_COLUMNS;
+    this.rows = level.field.length / this.columns;
     this.walls = new Set(level.walls ?? []);
     this.mechanics = structuredClone(level.mechanics ?? emptyMechanics());
     this.palette = level.palette ? [...level.palette] : [...PALETTE];
     if (this.palette.length !== PALETTE.length || this.palette.some(c => !/^#[0-9a-f]{6}$/i.test(c))) throw new Error('Неверная палитра');
-    if (!Number.isInteger(this.columns) || this.columns < 4 || this.columns > 7 ||
-        level.cells.length !== WIDTH * HEIGHT || level.field.length !== this.columns ** 2) {
+    if (!Number.isInteger(this.columns) || this.columns < 4 || this.columns > 9 || !Number.isInteger(this.rows) || this.rows < 3 || this.rows > 7 ||
+        level.cells.length !== WIDTH * HEIGHT) {
       throw new Error('Неверный размер уровня');
     }
     if ([...this.walls].some(i => !Number.isInteger(i) || i < 0 || i >= level.field.length || level.field[i] !== null)) {

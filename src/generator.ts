@@ -117,12 +117,13 @@ export function rebalance(level:Level,failed:Game):boolean {
 
 function candidate(number: number, seed: number, random: () => number, fallbackColumns?:number, profile?:GenerationProfile): GeneratedLevel {
   const columns = profile?.columns ?? fallbackColumns ?? difficulty(number) + 4;
+  const rows = profile?.rows ?? columns;
   const kinds=profile?.kinds ?? (fallbackColumns ? [] : mechanicsFor(number,columns));
   const wallCount = profile || kinds.length || columns === 4 ? 0 : (columns - 4) * 2 - Math.floor(random() * 2);
   const walls = new Set<number>(profile?.walls);
-  const empty = Array<BucketSpec | null>(columns ** 2).fill(null);
+  const empty = Array<BucketSpec | null>(columns * rows).fill(null);
   for (let trial = 0; walls.size < wallCount && trial < 100; trial++) {
-    const index = columns + Math.floor(random() * (columns ** 2 - columns));
+    const index = columns + Math.floor(random() * (columns * rows - columns));
     if (walls.has(index)) continue;
     walls.add(index);
     let connected = true;
@@ -138,7 +139,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
   const counts = Array(PALETTE.length).fill(0);
   for (const color of cells) counts[color]++;
   const quantity: number[] = counts.map((count,i)=>i&&count?1:0);
-  const total = columns ** 2 - walls.size - columns;
+  const total = columns * rows - walls.size - columns;
   for (let i = quantity.reduce((a,b)=>a+b,0); i < total; i++) {
     let color = 1;
     for (let c = 2; c < PALETTE.length; c++) if (counts[c] / quantity[c] > counts[color] / quantity[color]) color = c;
@@ -152,7 +153,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
       specs.push({ id: specs.length, color, capacity }); remaining -= capacity;
     }
   }
-  const unconstrained = Array<BucketSpec | null>(columns ** 2).fill(null);
+  const unconstrained = Array<BucketSpec | null>(columns * rows).fill(null);
   specs.forEach((b, i) => { unconstrained[i] = b; });
   const game = new Game({ cells, field: unconstrained, columns });
   const order: number[] = [];
@@ -175,7 +176,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
       if(!partial)break;
       const remainder=partial.capacity-partial.filled;
       const receiver=game.field.find(b=>b?.color===partial.color);
-      if(!receiver&&specs.length>=columns**2-walls.size)break;
+      if(!receiver&&specs.length>=columns*rows-walls.size)break;
       specs[partial.id].capacity=partial.filled;
       if(receiver){receiver.capacity+=remainder;specs[receiver.id].capacity=receiver.capacity;}
       else{
@@ -186,15 +187,15 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
     }
   }
   if (game.status !== 'won' || order.length !== specs.length) throw new Error('Нет решения');
-  const occupancy = Array.from({ length: columns ** 2 }, (_, id) => walls.has(id) ? null : { id, color: 1, capacity: 1 });
-  let field = Array<BucketSpec | null>(columns ** 2).fill(null);
+  const occupancy = Array.from({ length: columns * rows }, (_, id) => walls.has(id) ? null : { id, color: 1, capacity: 1 });
+  let field = Array<BucketSpec | null>(columns * rows).fill(null);
   for (const id of order) {
     const frontier = [...exitPaths(occupancy, columns, walls).keys()];
     const position = frontier[Math.floor(random() * frontier.length)];
     field[position] = specs[id]; occupancy[position] = null;
   }
   let mechanics:Mechanics|undefined;
-  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds,random,walls));
+  if(kinds.length)({field,mechanics}=arrangeMechanics(specs,order,columns,kinds,random,walls,rows));
   const level: Level = { cells, field, columns, walls: [...walls], mechanics,palette };
   let checked:ReturnType<typeof solve>|undefined;
   const usedPaths=new Set<number>();
@@ -231,7 +232,7 @@ export function generateLevel(number: number, seed = seedFor(number), fallbackCo
   throw new Error('Лимит генерации исчерпан', {cause});
 }
 
-export interface GenerationProfile { columns:number; kinds:number[]; walls:number[] }
+export interface GenerationProfile { columns:number; rows?:number; kinds:number[]; walls:number[] }
 export function generateCandidate(number:number,seed:number,profile:GenerationProfile):GeneratedLevel {
   return candidate(number,seed,randomFrom(seed),undefined,profile);
 }
