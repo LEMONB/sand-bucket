@@ -2,6 +2,7 @@ import { expect,it } from 'vitest';
 import { Game, WIDTH, HEIGHT, type Level } from '../src/game';
 import { campaignKinds, campaignPhase } from '../src/campaign-rules';
 import { layoutFor } from '../scripts/campaign/layout';
+import { assertCapacities } from '../scripts/campaign/capacities';
 import { certify,replayDecisions } from '../scripts/campaign/solver';
 
 it('recreates the same candidate and eight proofs from the same inputs',async()=>{
@@ -10,6 +11,7 @@ it('recreates the same candidate and eight proofs from the same inputs',async()=
  expect(first.error).toBeUndefined();expect(first.level).toBeDefined();
  expect(second.level).toEqual(first.level);expect(second.proofs).toEqual(first.proofs);
  expect(first.proofs).toHaveLength(8);
+ assertCapacities(first.level!);
 },30000);
 
 it('introduces active mechanics in waves, with a quiet fifth level',()=>{
@@ -72,4 +74,15 @@ it.each([1,23,36,127])('certifies merged colors at level %i without changing its
     expect(replayDecisions(level,proof.decisions,speed,pause).decisions).toEqual(proof.decisions);
   }
   expect(level).toEqual(before);
+},30000);
+
+it('preserves an existing layout while certifying normalized capacities',async()=>{
+ const {preserveLayout}=await import('../scripts/campaign/candidate');
+ const {campaignLevel,playableLevel}=await import('../src/campaign');
+ const source=campaignLevel(1),before=structuredClone(source),result=preserveLayout(source);
+ expect(result.error).toBeUndefined();expect(result.retainedLayout).toBe(true);
+ expect(result.proofs).toHaveLength(8);assertCapacities(result.level!);
+ const withoutCapacity=(level:Level)=>({...level,field:level.field.map(b=>b?{...b,capacity:0}:null)});
+ expect(withoutCapacity(playableLevel(result.level!))).toEqual(withoutCapacity(playableLevel(source)));
+ expect(source).toEqual(before);
 },30000);

@@ -29,7 +29,7 @@ export function verificationOptions(args: string[], count: number): { levels?: n
   const options: { levels?: number[]; changed?: string; force: boolean } = { force: false };
   for (let i=0; i<args.length; i++) {
     const arg=args[i];
-    if (['--all','--pilot','--verify','--verify-playable'].includes(arg) || /^--workers=\d+$/.test(arg)) continue;
+    if (['--all','--pilot','--verify','--verify-playable','--rebalance-capacities'].includes(arg) || /^--workers=\d+$/.test(arg)) continue;
     if (arg==='--force' && !options.force) { options.force=true; continue; }
     if (arg==='--levels' && options.levels===undefined) {
       const value=args[++i] ?? '';

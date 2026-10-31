@@ -1,10 +1,11 @@
 import { playableLevel } from '../src/campaign-art.ts';
 import { parentPort } from 'node:worker_threads';
-import { prepare } from './campaign/candidate.ts';
+import { prepare, preserveLayout } from './campaign/candidate.ts';
 import { certify, replayDecisions, type Proof } from './campaign/solver.ts';
 import type { CampaignLevel } from '../src/campaign-types.ts';
-parentPort!.on('message',({number,attempt,level,proofs,mergedColors}:{number:number;attempt:number;level?:CampaignLevel;proofs?:Proof[];mergedColors?:boolean})=>{
-  if(level&&(proofs||mergedColors)){
+parentPort!.on('message',({number,attempt,level,proofs,mergedColors,source}:{number:number;attempt:number;level?:CampaignLevel;proofs?:Proof[];mergedColors?:boolean;source?:CampaignLevel})=>{
+  if(source){parentPort!.postMessage({result:preserveLayout(source)});}
+  else if(level&&(proofs||mergedColors)){
     try{
       const playable=playableLevel(level);
       const cases=proofs?.length?proofs:[1,2].flatMap(speed=>[0,120,1800,-1].map(pause=>({speed:speed as 1|2,pause,decisions:[]})));
