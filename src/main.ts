@@ -21,6 +21,8 @@ let storage: Pick<Storage,'getItem'|'setItem'>;
 try { storage=localStorage; } catch { storage={getItem(){throw Error();},setItem(){throw Error();}}; }
 const progress=new ProgressStore(storage);
 const root=document.querySelector<HTMLDivElement>('#app')!;
+function sizeBelt():void {root.style.setProperty('--belt-scale',String(Math.max(.75,Math.min(1,window.innerHeight/760))));}
+sizeBelt();
 root.innerHTML=`<p id="update-note" class="update-note" role="status" hidden>Обновление готово. Применится при переходе в меню или запуске уровня.</p><section id="menu" class="menu" aria-label="Главное меню">
 <header class="brand"><span class="brand-mark">${bucketIcon}</span><span>SAND BUCKET</span></header>
 <div class="intro"><span class="eyebrow">МАЛЕНЬКАЯ ПАУЗА</span><h1>Всё течёт.<br><span>Песок тоже.</span></h1><p>Новый узор. Знакомое спокойствие.</p></div>
@@ -163,7 +165,7 @@ el('play').addEventListener('click',()=>void start());el('home').addEventListene
 el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing')reset();});
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
 el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
-window.addEventListener('resize',()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}});
+window.addEventListener('resize',()=>{sizeBelt();if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}});
 window.addEventListener('scroll',()=>{if(visible){belt.measure();belt.draw(game,0,speed);}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{

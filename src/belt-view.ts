@@ -5,7 +5,7 @@ import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent, type S
 
 export class BeltView {
   private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number; marks: HTMLElement }[][] = [];
-  private readonly effects: { element: HTMLElement; wrap: HTMLElement; rope: HTMLElement; x:number; y:number; active: boolean; event?: GameEvent; started: number }[] = [];
+  private readonly effects: { element: HTMLElement; wrap: HTMLElement; rope: HTMLElement; clip: HTMLElement; x:number; y:number; active: boolean; event?: GameEvent; started: number }[] = [];
   private readonly stream = document.createElement('canvas');
   private readonly effectsLayer = document.createElement('div');
   private readonly streamContext = this.stream.getContext('2d')!;
@@ -19,6 +19,7 @@ export class BeltView {
   private beltRect!: DOMRect;
   private cells: {x:number;y:number}[] = [];
   private grainSize = 32;
+  private beltScale = 1;
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
   constructor(private belt: HTMLElement, private field: HTMLElement, private sand: HTMLElement) {
     this.effectsLayer.className='bucket-effects';document.body.append(this.effectsLayer);
@@ -35,16 +36,18 @@ export class BeltView {
     }
     // At most five launches plus recent completions; reuse a bounded visual pool.
     for(let i=0;i<20;i++) {
+      const clip=document.createElement('div');clip.className='bucket-effect';this.effectsLayer.append(clip);
       const element=document.createElement('div');element.className='flying-bucket';element.hidden=true;element.setAttribute('aria-hidden','true');
-      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><small class="completion-label">100%</small><span class="sparkles">✦ · ✧</span>`;this.effectsLayer.append(element);
-      const wrap=element.cloneNode(true) as HTMLElement;this.effectsLayer.append(wrap);
-      const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');this.effectsLayer.append(rope);
-      this.effects.push({element,wrap,rope,x:0,y:0,active:false,started:0});
+      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><small class="completion-label">100%</small><span class="sparkles">✦ · ✧</span>`;clip.append(element);
+      const wrap=element.cloneNode(true) as HTMLElement;clip.append(wrap);
+      const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');clip.append(rope);
+      this.effects.push({element,wrap,rope,clip,x:0,y:0,active:false,started:0});
     }
   }
   measure(): void {
     this.beltRect=this.belt.getBoundingClientRect();
-    this.effectsLayer.style.left=`${this.beltRect.left}px`;this.effectsLayer.style.width=`${this.beltRect.width}px`;
+    this.beltScale=this.beltRect.height/68;
+    this.effectsLayer.style.setProperty('--belt-scale',String(this.beltScale));
     this.sandRect=this.sand.getBoundingClientRect();
     this.streamLeft=Math.min(this.sandRect.left,this.beltRect.left);
     this.streamTop=Math.min(this.sandRect.bottom-this.sandRect.height*5/128-8,this.beltRect.top);
@@ -75,7 +78,7 @@ export class BeltView {
       effect.element.style.color=game.palette[event.bucket.color];
       effect.element.querySelector('.belt-marks')!.innerHTML=bucketMarks(game,event.bucket);
       effect.element.classList.toggle('completion',event.type==='complete');
-      effect.element.style.width=`${event.type==='complete'?48:this.grainSize}px`;
+      effect.element.style.width=`${event.type==='complete'?48*this.beltScale:this.grainSize}px`;
       effect.wrap.innerHTML=effect.element.innerHTML;effect.wrap.className=effect.element.className;
     }
     game.events.length=0;
@@ -86,12 +89,12 @@ export class BeltView {
       for(let fragment=0;fragment<2;fragment++) {
         const view=this.views[slot][fragment];
         const x=(fragment===0?position:position+(position<.5?1:-1))*this.beltRect.width;
-        view.slot.style.transform=`translateX(${x-27}px)`;
+        view.slot.style.transform=`translateX(${x-27*this.beltScale}px)`;
         view.bucket.hidden=!visible;
         if(bucket&&view.id!==bucket.id){view.id=bucket.id;view.bucket.style.color=game.palette[bucket.color];view.marks.innerHTML=bucketMarks(game,bucket);}
         const settle=this.reduced.matches||!bucket?0:landingMotion((game.motionTick-bucket.arrivalTick)/16);
-        view.bucket.style.transform=`translateY(${settle*5}px) scale(${1+settle*.09},${1-settle*.1})`;
-        if(percent!==view.percent){view.percent=percent;view.fill.style.height=`${24*percent/100}px`;view.label.textContent=`${percent}%`;}
+        view.bucket.style.transform=`translateY(${settle*5*this.beltScale}px) scale(${1+settle*.09},${1-settle*.1})`;
+        if(percent!==view.percent){view.percent=percent;view.fill.style.height=`calc(${24*percent/100}px * var(--belt-scale, 1))`;view.label.textContent=`${percent}%`;}
       }
     }
     const ctx=this.streamContext;
@@ -101,7 +104,7 @@ export class BeltView {
       const t=(this.sandClock-grain.born)/.22;
       if(t>=1){grain.active=false;continue;}
       const targetX=this.beltRect.left+game.slotPosition(grain.slot)*this.beltRect.width-this.streamLeft;
-      const targetY=this.beltRect.top+25-this.streamTop;
+      const targetY=this.beltRect.top+25*this.beltScale-this.streamTop;
       const x=this.reduced.matches?targetX:grain.x+(targetX-grain.x)*t+grain.jitter*Math.sin(t*Math.PI);
       const y=this.reduced.matches?targetY:grain.y+(targetY-grain.y)*t*t;
       ctx.globalAlpha=this.reduced.matches ? .45*(1-t) : 1;
@@ -112,12 +115,13 @@ export class BeltView {
       if(!effect.active)continue;
       const event=effect.event!,complete=event.type==='complete';
       const t=complete?Math.min((this.clock-effect.started)/.8,1):Math.min((game.motionTick-event.motionTick!)/LAUNCH_TICKS,1);
-      const end={x:this.beltRect.left+game.slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34};
+      const end={x:this.beltRect.left+game.slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34*this.beltScale};
       let x=end.x,y=end.y,scale=1,scaleY=1,angle=0,opacity=1;
       if(complete){
+        effect.element.style.width=`${48*this.beltScale}px`;
         x=this.beltRect.left+(((event.tick%LOOP_TICKS)/LOOP_TICKS+event.slot/BELT_LIMIT)%1)*this.beltRect.width;
         const lift=Math.max(0,(t-.18)/.82);
-        y+=Math.sin(Math.min(t/.18,1)*Math.PI)*3-lift*lift*24;
+        y+=(Math.sin(Math.min(t/.18,1)*Math.PI)*3-lift*lift*24)*this.beltScale;
         scale=1+Math.sin(t*Math.PI)*.12-lift*lift*.35;scaleY=scale;
         opacity=1-lift*lift;
       }else{
@@ -125,23 +129,25 @@ export class BeltView {
         const start=((event.tick%LOOP_TICKS)/LOOP_TICKS+event.slot/BELT_LIMIT)%1;
         end.x=this.beltRect.left+(start+(game.tick-event.tick)/LOOP_TICKS)*this.beltRect.width;
         const path=event.path!;
-        const mouth={x:this.cells[path[path.length-1]].x,y:this.beltRect.bottom+4};
+        const mouth={x:this.cells[path[path.length-1]].x,y:this.beltRect.bottom+4*this.beltScale};
         const points=[...path.map(i=>this.cells[i]),mouth,end];
         const position=bucketPosition(points,t);
         const before=bucketPosition(points,Math.max(0,t-.015));
         x=position.x;y=position.y;
         angle=Math.max(-7,Math.min(7,(position.x-before.x)*.7))*Math.sin(t*Math.PI);
-        const width=this.grainSize+(48-this.grainSize)*t;
+        const width=this.grainSize+(48*this.beltScale-this.grainSize)*t;
         effect.element.style.width=`${width}px`;
         scaleY=1+Math.sin(t*Math.PI)*.035;
       }
       effect.x=x;effect.y=y;
-      effect.element.style.transform=`translate(${x-this.beltRect.left}px,${y}px) translate(-50%,-50%) rotate(${this.reduced.matches?0:angle}deg) scale(${this.reduced.matches?1:scale},${this.reduced.matches?1:scaleY})`;
+      effect.element.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) rotate(${this.reduced.matches?0:angle}deg) scale(${this.reduced.matches?1:scale},${this.reduced.matches?1:scaleY})`;
       effect.element.style.opacity=String(this.reduced.matches?(complete?opacity:0):opacity);
       effect.wrap.style.cssText=effect.element.style.cssText;
-      const wrapX=x-this.beltRect.left+(x<this.beltRect.left+this.beltRect.width/2?this.beltRect.width:-this.beltRect.width);
+      const wrapX=x+(x<this.beltRect.left+this.beltRect.width/2?this.beltRect.width:-this.beltRect.width);
       effect.wrap.style.transform=effect.element.style.transform.replace(/^translate\([^)]*\)/,`translate(${wrapX}px,${y}px)`);
-      effect.wrap.hidden=false;
+      const onBelt=complete||y<=this.beltRect.bottom;
+      effect.clip.style.clipPath=onBelt?`inset(0px calc(100% - ${this.beltRect.right}px) 0px ${this.beltRect.left}px)`:'none';
+      effect.wrap.hidden=!onBelt;
       if(t>=1){effect.active=false;effect.element.hidden=true;effect.wrap.hidden=true;}
     }
     for(const effect of this.effects){
@@ -151,7 +157,7 @@ export class BeltView {
       effect.rope.hidden=!visible;
       if(visible){
         const dx=partner!.x-effect.x,dy=partner!.y-effect.y;
-        Object.assign(effect.rope.style,{left:`${effect.x-this.beltRect.left}px`,top:`${effect.y-19}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
+        Object.assign(effect.rope.style,{left:`${effect.x}px`,top:`${effect.y-19*this.beltScale}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
       }
     }
   }
