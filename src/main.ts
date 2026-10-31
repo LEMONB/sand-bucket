@@ -4,7 +4,7 @@ import './interface.css';
 import './mechanics.css';
 import { FieldView } from './field-view';
 import { ART_TITLES } from './art-catalog';
-import { MECHANIC_HINTS } from './mechanics';
+import { MECHANIC_HINTS } from './mechanic-help';
 import { bucketIcon } from './bucket-icon';
 import { Game, advanceFrame, type Speed } from './game';
 import { campaignLevel, playableLevel } from './campaign';

@@ -12,7 +12,8 @@ import { topology } from './campaign/candidate.ts';
 import type { Proof } from './campaign/solver.ts';
 import { structuralSignature } from './campaign/selection.ts';
 import { FAMILIES } from './campaign/layout.ts';
-import { MECHANIC_NAMES } from '../src/mechanics.ts';
+import { MECHANIC_NAMES } from '../src/mechanic-help.ts';
+import { changedSince, playableKey, readVerified, verificationHash, verificationOptions, writeVerified } from './campaign/verification.ts';
 
 const root=new URL('../',import.meta.url);
 const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts'];
@@ -21,20 +22,25 @@ const hash=fingerprint.digest('hex'),directory=new URL(`.cache/campaign/${hash}/
 const catalogFingerprint=createHash('sha256').update(hash).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).digest('hex');
 mkdirSync(directory,{recursive:true});
 const args=process.argv.slice(2),pilot=args.includes('--pilot'),mergedColors=args.includes('--verify-playable'),verify=args.includes('--verify')||mergedColors;
+const options=verificationOptions(args,CAMPAIGN_COUNT);
+if(args.filter(arg=>['--pilot','--verify','--verify-playable','--all'].includes(arg)).length!==1)throw Error('Выберите один режим проверки или генерации');
 if(!pilot&&!verify&&!args.includes('--all'))throw Error('Укажите --pilot, --all, --verify или --verify-playable');
 const proofDirectory=new URL(`.cache/playable/${hash}/`,root);
-if(mergedColors)mkdirSync(proofDirectory,{recursive:true});
+const certificateDirectory=new URL('.cache/playable/verified/',root);
+const checkerHash=mergedColors?verificationHash(file=>readFileSync(new URL(file,root),'utf8')):'';
+if(mergedColors){mkdirSync(proofDirectory,{recursive:true});mkdirSync(certificateDirectory,{recursive:true});}
 const workerArg=args.find(arg=>arg.startsWith('--workers='));
 const workers=workerArg?Number(workerArg.split('=')[1]):Math.min(4,Math.max(1,availableParallelism()-1));
 if(!Number.isInteger(workers)||workers<1||workers>8)throw Error('Число workers должно быть от 1 до 8');
-const numbers=pilot?[1,6,11,16,21,26,31,36,41,46,103,104,154,203,204,254,304,354,399,400]:Array.from({length:CAMPAIGN_COUNT},(_,i)=>i+1);
+let numbers=pilot?[1,6,11,16,21,26,31,36,41,46,103,104,154,203,204,254,304,354,399,400]:Array.from({length:CAMPAIGN_COUNT},(_,i)=>i+1);
 const started=performance.now(),accepted=new Map<number,CandidateResult>(),failures:unknown[]=[],signatures=new Set<string>();
-let jobs=0,cached=0,processed=0;
+let jobs=0,cached=0,processed=0,verified=0,certificateHits=0;
 const startWorker=()=>new Worker(new URL('./campaign-worker.ts',import.meta.url));
-const pool=Array.from({length:workers},startWorker);
-const idle=[...pool];
+const pool:Worker[]=[];
+const idle:Worker[]=[];
 const waiting:Array<(worker:Worker)=>void>=[];
 async function work<T>(message:unknown):Promise<T>{
+  if(!idle.length&&pool.length<workers){const worker=startWorker();pool.push(worker);idle.push(worker);}
   let worker=idle.pop()??await new Promise<Worker>(resolve=>waiting.push(resolve));
   try{
     const result=await new Promise<T>((resolve,reject)=>{
@@ -77,9 +83,25 @@ try{
   if(verify){
     const catalog=JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog;
     if((!mergedColors&&catalog.fingerprint!==catalogFingerprint)||catalog.version!==CAMPAIGN_VERSION||catalog.levels.length!==400)throw Error('Каталог устарел или неполон');
-    for(let offset=0;offset<catalog.levels.length;offset+=workers){
-    await Promise.all(catalog.levels.slice(offset,offset+workers).map(async (level,index)=>{
-      if(level.number!==offset+index+1||level.art!==(level.number-1)%100)throw Error('Нарушен порядок каталога');
+    for(const [index,level] of catalog.levels.entries()){
+      if(level.number!==index+1||level.art!==(level.number-1)%100)throw Error('Нарушен порядок каталога');
+    }
+    if(mergedColors){
+      for(const level of catalog.levels){
+        const playable=playableLevel(level);new Game(playable);
+        const signature=structuralSignature({...level,...playable});
+        if(signatures.has(signature))throw Error(`Повтор планировки ${level.number}`);signatures.add(signature);
+      }
+      numbers=options.levels??(options.changed?await changedSince(root,catalog,options.changed):numbers);
+      console.log(`Выбрано ${numbers.length}/${catalog.levels.length} уровней; остальные не симулируются.`);
+    }
+    const selectedLevels=numbers.map(number=>catalog.levels[number-1]);
+    for(let offset=0;offset<selectedLevels.length;offset+=workers){
+    await Promise.all(selectedLevels.slice(offset,offset+workers).map(async level=>{
+      const key=createHash('sha256').update(checkerHash).update(playableKey(playableLevel(level))).digest('hex');
+      const certificate=new URL(`${key}.json`,certificateDirectory);
+      const certified=mergedColors&&!options.force?readVerified(certificate,key):undefined;
+      if(certified){certificateHits++;accepted.set(level.number,{level,proofs:certified,generationMs:0,certificationMs:0});return;}
       let record:CandidateResult|undefined;
       for(let attempt=0;!mergedColors&&attempt<24;attempt++){
         const file=new URL(`${level.number}-${attempt}.json`,directory);
@@ -101,7 +123,8 @@ try{
       const playable=playableLevel(level);
       new Game(playable);
       record.signature=structuralSignature({...level,...playable});
-      if(signatures.has(record.signature))throw Error(`Повтор или неверная подпись планировки ${level.number}`);signatures.add(record.signature);
+      if(!mergedColors){if(signatures.has(record.signature))throw Error(`Повтор или неверная подпись планировки ${level.number}`);signatures.add(record.signature);}
+      verified++;
       const checked=await work<{error?:string;proofs?:Proof[]}>({level,proofs:record.proofs,mergedColors});
       if(checked.error){
         if(!mergedColors)throw Error(`Уровень ${level.number}: ${checked.error}`);
@@ -110,7 +133,10 @@ try{
         return;
       }
       if(mergedColors){
-        writeFileSync(new URL(`${level.number}.json`,proofDirectory),JSON.stringify({level,proofs:checked.proofs}));
+        if(!checked.proofs)throw Error(`Нет доказательств для ${level.number}`);
+        writeVerified(certificate,key,checked.proofs);
+        const saved=new URL(`${level.number}.json`,proofDirectory),temp=new URL(`${level.number}.${process.pid}.tmp`,proofDirectory);
+        writeFileSync(temp,JSON.stringify({level,proofs:checked.proofs}));renameSync(temp,saved);
       }
       record.proofs=checked.proofs;
       accepted.set(level.number,record);
@@ -138,14 +164,14 @@ try{
     }
   }
   const results=[...accepted.values()].sort((a,b)=>a.level!.number-b.level!.number);
-  const report={fingerprint:catalogFingerprint,candidateFingerprint:hash,elapsedMs:performance.now()-started,workers,jobs,cached,accepted:results.length,requested:numbers.length,failures,levels:results.map(({level,proofs,...metrics})=>({number:level!.number,...metrics,proofs:proofs?.map(({decisions,...summary})=>({...summary,moves:decisions.length}))}))};
+  const report={fingerprint:catalogFingerprint,candidateFingerprint:hash,elapsedMs:performance.now()-started,workers,jobs,cached,verified,certificateHits,selected:numbers,accepted:results.length,requested:numbers.length,failures,levels:results.map(({level,proofs,...metrics})=>({number:level!.number,...metrics,proofs:proofs?.map(({decisions,...summary})=>({...summary,moves:decisions.length}))}))};
   writeFileSync(new URL('report.json',directory),JSON.stringify(report,null,2));
   const gallery=results.map(r=>{
     const playable=playableLevel(r.level!);
     return {level:{...r.level,field:playable.field,mechanics:playable.mechanics},pressure:r.pressure,art:[...playable.cells],palette:playable.palette};
   });
   writeFileSync(new URL('gallery.html',directory),`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Кампания: ${results.length} уровней</title><style>body{font:16px system-ui;background:#f5f1e9;color:#254c43;padding:24px}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:24px}article{background:white;padding:16px;border-radius:12px}canvas{width:100%;image-rendering:pixelated}.grid{display:grid;gap:2px;margin-top:12px}.cell{aspect-ratio:1;border-radius:3px;display:grid;place-items:center;font-size:11px;color:white;text-shadow:0 1px 3px #000,0 0 2px #000}a{color:inherit}</style><h1>${results.length} уровней</h1><p>Открывайте игровые уровни через npm run dev. Метрики не заменяют оценку интересности.</p><main></main><script>const familyNames=${JSON.stringify(FAMILIES)},names=${JSON.stringify(MECHANIC_NAMES)};const records=${JSON.stringify(gallery)};for(const {level:l,art,palette,pressure} of records){const a=document.createElement('article');a.innerHTML='<h2><a href="http://127.0.0.1:5173/sand-bucket/?level='+l.number+'">'+l.number+'</a></h2><p>Семейство '+familyNames[l.family]+' · Механики '+l.kinds.map(k=>names[k]).join(', ')+' · Занято мест до '+pressure+'</p><canvas width="128" height="128"></canvas>';const ctx=a.querySelector('canvas').getContext('2d');art.forEach((c,i)=>{ctx.fillStyle=palette[c];ctx.fillRect(i%128,Math.floor(i/128),1,1)});const grid=document.createElement('div');grid.className='grid';grid.style.gridTemplateColumns='repeat('+l.columns+',1fr)';l.field.forEach((b,i)=>{const c=document.createElement('div');c.className='cell';c.style.background=l.walls.includes(i)?'#82988b':b?(b.hidden?'#aaa':palette[b.color]):'#eee';const m=l.mechanics;const marks=[];if(m){if(m.queues.some(q=>q.cell===i))marks.push('Q');if(m.platforms.some(p=>p.cells.includes(i)))marks.push('P');if(m.trays.some(t=>t.includes(i)))marks.push('T');if(m.gates.some(t=>t.cells.includes(i)||t.key===b?.id))marks.push('⚿');if(m.lids.some(t=>t.key===b?.id))marks.push('◇');if(m.links.some(t=>t.includes(b?.id)))marks.push('↔');}if(b?.swapWith!==undefined)marks.push('⇄');c.textContent=(b?(b.hidden?'? ':'')+b.capacity:'')+' '+marks.join('');c.title=b?'ID '+b.id:'';grid.append(c)});a.append(grid);document.querySelector('main').append(a)}</script></html>`);
-  console.log(JSON.stringify({accepted:report.accepted,requested:report.requested,elapsedSeconds:Math.round(report.elapsedMs/1000),jobs,cached,report:new URL('report.json',directory).pathname}));
+  console.log(JSON.stringify({accepted:report.accepted,requested:report.requested,elapsedSeconds:Math.round(report.elapsedMs/1000),jobs,cached,verified,certificateHits,report:new URL('report.json',directory).pathname}));
   if(results.length!==numbers.length)throw Error('Неполная партия: каталог не изменён; причины в report.json');
   if(!pilot&&!verify){
     const catalog:CampaignCatalog={version:CAMPAIGN_VERSION,fingerprint:catalogFingerprint,levels:results.map(r=>r.level!)};
