@@ -4,7 +4,7 @@ import './interface.css';
 import './mechanics.css';
 import { FieldView } from './field-view';
 import { ART_TITLES } from './art-catalog';
-import { MECHANIC_HINTS } from './mechanics';
+import { MECHANIC_HINTS } from './mechanic-help';
 import { bucketIcon } from './bucket-icon';
 import { Game, advanceFrame, type Speed } from './game';
 import { campaignLevel, playableLevel } from './campaign';
@@ -31,7 +31,7 @@ root.innerHTML=`<p id="update-note" class="update-note" role="status" hidden>О�
 <section id="game" class="mock-game" hidden aria-label="Игра">
 <header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span id="level-number" class="mock-brand"></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
 <div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span></div>
-<div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div><div class="belt-row"><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
+<div class="sand-space"><div id="sand" class="mock-sand" role="img" aria-label="Поле песка"></div></div><div class="belt-row"><div id="belt" class="mock-belt" aria-label="Конвейер, пять мест"></div><button id="demo-speed" aria-label="Ускорить в два раза" aria-pressed="false"><span>×1</span></button></div><div id="field" class="mock-field" role="group" aria-label="Поле вёдер"></div><span id="hint" class="sr-only" role="status"></span>
 </section><div id="overlay" class="overlay" hidden><section class="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-icon">✦</div><h2 id="result-title"></h2><p id="result-copy"></p><button id="result-action" class="primary"></button><button id="result-home" class="text-button">В меню</button></section></div>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const sand=new GameRenderer(),belt=new BeltView(el('belt'),el('field'),el('sand'));
@@ -165,7 +165,8 @@ el('play').addEventListener('click',()=>void start());el('home').addEventListene
 el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing')reset();});
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
 el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
-window.addEventListener('resize',()=>{sizeBelt();if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}});
+window.addEventListener('resize',sizeBelt);
+new ResizeObserver(()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}}).observe(el('game'));
 window.addEventListener('scroll',()=>{if(visible){belt.measure();belt.draw(game,0,speed);}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{

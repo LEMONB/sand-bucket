@@ -22,7 +22,7 @@ export function bucketMarks(game: Game, bucket: BucketSpec, hidden = false): str
   if (bucket.swapWith !== undefined) {
     const partner = game.field.find(b => b?.id === bucket.swapWith);
     const nextColor = !hidden && partner && !game.isHidden(partner) ? game.palette[partner.color] : '#77867f';
-    marks += `<span style="color:${nextColor}">${gameIcon('swap')}</span><small class="swap-number">${Math.min(bucket.id,bucket.swapWith)+1}</small>`;
+    marks += `<span style="color:${nextColor}">${gameIcon('swap')}</span>`;
   }
   return `<span class="bucket-roles" style="color:${color}">${marks}</span>`;
 }

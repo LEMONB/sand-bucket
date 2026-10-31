@@ -23,6 +23,7 @@ Use Node.js 22.12 or newer; CI uses Node.js 24.
 - `npm run test:full`: manually run the extensive generator sweep.
 - `npm run campaign:pilot`: prepare 20 representative campaign positions.
 - `npm run campaign:generate`: prepare all 400 levels, resume from cache, and atomically publish a complete catalog.
+- `npm run campaign:verify-playable -- --changed origin/main`: verify affected gameplay inputs against the base revision; use `--levels 6,209` for an explicit subset and `--force` to replay despite cached success.
 - `npm run campaign:verify`: replay all catalog proofs from the preparation cache.
 - `npm run generate:level`: regenerate legacy fallback fixtures used by regression tests.
 
@@ -32,7 +33,7 @@ Follow surrounding code: two-space indentation, single quotes, semicolons, and s
 
 ## Testing Guidelines
 
-Place behavior-focused tests in `tests/*.test.ts`. No numerical coverage threshold is configured. Cover changed mechanics, physics, generation, and persistence. Preserve deterministic generation and solvability at both belt speeds. Run `npm run check` and `npm run build` before submitting code changes; keep the full sweep manual. After a failed command, ensure its process has exited before retrying.
+Place behavior-focused tests in `tests/*.test.ts`. No numerical coverage threshold is configured. Cover changed mechanics, physics, generation, and persistence. Preserve deterministic generation and solvability at both belt speeds. During iteration, run only checks relevant to the change. Run `npm run check` and `npm run build` once before submitting the final changes; repeat only after relevant edits or failures. Keep the full sweep manual. UI, layout and hint text changes do not require campaign simulation. For gameplay layout changes, check grids 4×4–7×7 in mobile WebKit, including 375×812 and 393×852 with PWA safe-area insets and the update banner; assert that the complete field fits, not merely that overflow is hidden. For generator changes, start with focused tests and the pilot, not all 400 positions. After a failed command, ensure its process has exited before retrying.
 
 ## Commit & Pull Request Guidelines
 
@@ -42,4 +43,8 @@ Describe the behavior changed, validation performed, and relevant issues. Includ
 
 Every release must increase `package.json` and both root versions in `package-lock.json` together using `major.minor.patch`: patch for fixes, minor for new features. Bump once per release branch, not once per commit. Run `npm run check:version -- origin/main` before submitting. CI checks branches/PRs against current main and main pushes against the pre-push revision; unchanged or lower versions block deployment. Do not bypass this check.
 
-`npm run campaign:verify-playable` checks existing levels with merged gameplay colors, reuses cached proofs when valid and finds new solutions when needed, without changing layouts or capacities. Run it before releasing any artwork or campaign changes; campaign generation also certifies the merged colors. Verified solutions are saved separately under `.cache/playable/`. A failure blocks releasing the color change; do not regenerate automatically.
+`npm run campaign:verify-playable` checks existing levels with merged gameplay colors, reuses cached proofs when valid and finds new solutions when needed, without changing layouts or capacities. Use `--changed origin/main` before releasing artwork or campaign changes; it selects all levels when shared simulation/checker rules changed. An explicit `--levels` subset does not certify unrelated levels. Never regenerate the catalog merely to validate existing levels; campaign generation also certifies the merged colors. Verified solutions are saved separately under `.cache/playable/`. A failure blocks releasing the color change; do not regenerate automatically.
+
+Successful verification results in `.cache/playable/verified/` are keyed by gameplay inputs and simulation/checker code. Keep UI text and generation metadata out of these dependencies; update `VERIFICATION_FILES` when adding runtime rule/checker dependencies. Cached results must cover both speeds and all four pause scenarios.
+
+Debug-only numbers and identifiers on buckets may be used during development, but must be removed before a production release. Keep only explicitly approved gameplay counters, such as the dispenser remainder and belt fill percentage. Check this during release review.
