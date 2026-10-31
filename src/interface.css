@@ -108,3 +108,12 @@
   .belt-row { grid-area: 3 / 2; }
   .mock-field { grid-area: 4 / 2; }
 }
+
+@media (display-mode: standalone) {
+  /* A solid pinned header gives iOS a surface for its status-bar edge effect. */
+  #app.playing { padding-top: 0; }
+  #app.playing .mock-header { position: sticky; top: 0; z-index: 6; height: calc(46px + env(safe-area-inset-top)); margin: 0 -12px; padding: env(safe-area-inset-top) 12px 0; background: #f5f1e9; }
+}
+@media (display-mode: standalone) and (min-width: 600px) and (max-height: 500px) {
+  .mock-game { grid-template-rows: calc(46px + env(safe-area-inset-top)) 36px 92px minmax(0, 1fr); }
+}
