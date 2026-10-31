@@ -79,7 +79,7 @@ export class FieldView {
       const name=game.palette[1]===PALETTE[1]?COLOR_NAMES[bucket.color]:['','Тёмное','Бирюзовое','Песочное','Коралловое','Синее','Зелёное','Жёлтое','Фиолетовое'][bucket.color];
       button.setAttribute('aria-label',`${hidden?'Скрытое':name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, диспенсер: осталось вёдер ${remaining}`:''}`);
       const old=this.positions.get(bucket.id);
-      const base=available?'rotate(0deg) scale(1)':'rotate(180deg) scale(.7)';
+      const base=available?'rotate(0deg) scale(1)':'rotate(180deg)';
       if(old!==undefined&&old!==i){
         const from=this.buttons[old].getBoundingClientRect(),to=button.getBoundingClientRect();
         const tray=game.mechanics.trays.find(t=>t.includes(i)&&t.includes(old));

@@ -31,7 +31,7 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .mock-field { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, var(--columns)), minmax(0, 1fr)); gap: 2px; padding: 6px; min-height: 0; }
 .mock-field .field-bucket { height: 100%; min-width: 0; border-radius: 8px; }
 .mock-field .bucket-shape { width: 80%; height: 80%; }
-.mock-field .is-blocked .bucket-shape { transform: rotate(180deg) scale(.7); }
+.mock-field .is-blocked .bucket-shape { transform: rotate(180deg); }
 .mock-wall { margin: 18% 12%; border-radius: 5px; background: linear-gradient(#aeb7a6 0 45%, #929e8c 46% 51%, #a3af9b 52%); box-shadow: inset 0 2px #c4cbbd, 0 2px #83917d; }
 .bucket-effects { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 30; }
 .bucket-effect { position: absolute; inset: 0; }

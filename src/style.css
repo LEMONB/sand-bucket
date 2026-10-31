@@ -62,7 +62,7 @@ progress::-moz-progress-bar { background: #69aa91; }
 .field-bucket.is-available:hover { background: #ffffff99; }
 .field-bucket.is-available:active .bucket-shape { transform: translateY(2px) scale(1.05, .92); transition-duration: 80ms; }
 .field-bucket:disabled { cursor: default; opacity: 1; }
-.field-bucket.is-blocked .bucket-shape { transform: rotate(180deg) scale(.7); }
+.field-bucket.is-blocked .bucket-shape { transform: rotate(180deg); }
 .field-bucket.is-empty .bucket-shape { opacity: 0; }
 .field-bucket.is-empty::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #ced8c5; position: absolute; }
 .hint:empty { display: none; }
