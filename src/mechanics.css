@@ -13,7 +13,6 @@
 .sand-lid { position: absolute; z-index: 2; border: 2px solid #fff2c6; border-radius: 5px; background: #ffffff28; box-shadow: 0 2px 0 #203e5677; color: #fffaf2; display: flex; align-items: end; justify-content: end; padding: 3px; font-size: 20px; pointer-events: none; }
 .mock-field.is-changing { pointer-events: none; }
 #mechanic-help { background: transparent; border: 0; color: #506c60; font-size: 11px; padding: 4px; }
-.platform-next { position: absolute; bottom: 0; left: 10%; right: 10%; display: flex; gap: 2px; }
 #mechanic-help { margin-left: auto; }
 .mock-field .on-surface.is-available { background: transparent; }
 .mock-field .on-surface.is-available:hover { background: #fff2; }
@@ -36,7 +35,7 @@
 .bucket-mark { top: 44%; display: grid; place-items: center; color: #38554b; }
 .bucket-shape .bucket-mark .game-icon { width: 20px; height: 20px; }
 .bucket-extra .queue-count { top: auto; bottom: 16px; right: 0; }
-.queue-colors, .platform-next { justify-content: center; gap: 1px; }
+.queue-colors { justify-content: center; gap: 1px; }
 .next-bucket { position: relative; display: block; width: 14px; height: 15px; flex: 0 1 14px; font-style: normal; }
 .next-bucket svg { display: block; width: 100%; height: 100%; }
 .next-bucket b { position: absolute; inset: 6px 0 0; text-align: center; font: bold 8px/9px system-ui; color: #38554b; }

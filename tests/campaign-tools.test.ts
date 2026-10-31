@@ -62,3 +62,14 @@ it('compares mechanic positions and treats mirrored connections as duplicates',a
  const mirror=(i:number)=>Math.floor(i/4)*4+3-i%4;
  expect(structuralSignature({...record,walls:[mirror(8)],field:field.map((_,i)=>field[mirror(i)])})).toBe(structuralSignature(record));
 });
+
+it.each([1,23,36,127])('certifies merged colors at level %i without changing its buckets', async number => {
+  const { campaignLevel, playableLevel } = await import('../src/campaign');
+  const level = playableLevel(campaignLevel(number)), before = structuredClone(level);
+  for (const speed of [1,2] as const) for (const pause of [0,120,1800,-1]) {
+    const proof = certify(level,speed,pause);
+    expect(proof.nodes).toBe(0);
+    expect(replayDecisions(level,proof.decisions,speed,pause).decisions).toEqual(proof.decisions);
+  }
+  expect(level).toEqual(before);
+},30000);

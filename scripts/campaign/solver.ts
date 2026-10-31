@@ -1,6 +1,6 @@
 import { rebalance } from '../../src/generator.ts';
 import { createHash } from 'node:crypto';
-import { Game, WIDTH, HEIGHT, COLLECTION_DEPTH, LOOP_TICKS, type Level, type Speed } from '../../src/game.ts';
+import { Game, WIDTH, HEIGHT, COLLECTION_DEPTH, LOOP_TICKS, type Level, type Speed, type BucketSpec } from '../../src/game.ts';
 
 export interface Decision { bucketId:number; collected:number; completed:number[]; exposed:boolean }
 export interface Proof { speed:Speed; pause:number; decisions:Decision[]; ticks:number; peakSlots:number; unproductive:number; nodes:number }
@@ -53,19 +53,21 @@ export function replayDecisions(level:Level,decisions:Decision[],speed:Speed,pau
 }
 
 // Try the inexpensive policy first; search only when useful colors are blocked.
-function greedy(level:Level,speed:Speed,pause:number):{game:Game;moves:Decision[]} {
+function greedy(level:Level,speed:Speed,pause:number,opening=false,compare=(a:BucketSpec,b:BucketSpec)=>a.color-b.color||a.capacity-b.capacity):{game:Game;moves:Decision[]} {
   const game=new Game(level),ids=allIds(level),moves:Decision[]=[];let readyAt=-1;let pending:Decision|undefined;
   const limit=tickLimit(level,pause);
   while(game.status==='playing'&&game.tick<limit){
-    const buckets=pending?[]:[...game.paths.keys()].map(i=>game.field[i]!).sort((a,b)=>a.color-b.color||a.capacity-b.capacity);
+    const buckets=pending?[]:[...game.paths.keys()].map(i=>game.field[i]!).sort(compare);
     const bucket=buckets.find(b=>{
       if(!exposed(game,b.color)||game.buckets.some(s=>s.color===b.color))return false;
       const pair=game.mechanics.links.find(p=>p.includes(b.id));
       const other=pair&&game.field.find(o=>o&&o.id!==b.id&&pair.includes(o.id));
       return !other||game.slots.filter(s=>!s).length<2||(exposed(game,other.color)&&!game.buckets.some(s=>s.color===other.color));
     });
-    const selected=pending?game.field.find(b=>b?.id===pending!.bucketId):bucket;
-    if(selected&&ready(game,selected.id)&&exposed(game,selected.color)){
+    // An empty departure can uncover the useful bucket behind it.
+    const next=bucket??(opening&&game.buckets.every(b=>!exposed(game,b.color))?buckets[0]:undefined);
+    const selected=pending?game.field.find(b=>b?.id===pending!.bucketId):next;
+    if(selected&&ready(game,selected.id)&&(opening||exposed(game,selected.color))){
       if(readyAt<0){pending=decision(game,selected.id,ids);readyAt=game.tick+pauseTicks(pause,moves.length);}
       if(game.tick>=readyAt){moves.push(pending!);game.launch(selected.id);readyAt=-1;pending=undefined;}
     }else {readyAt=-1;pending=undefined;}
@@ -76,6 +78,16 @@ function greedy(level:Level,speed:Speed,pause:number):{game:Game;moves:Decision[
 export function certify(level:Level,speed:Speed,pause:number):Proof {
   const result=greedy(level,speed,pause),easy=result.game.status==='won'?result.moves:undefined;
   if(easy){try{return replayDecisions(level,easy,speed,pause);}catch{/* Search can find a different order. */}}
+  const orders = [
+    (a:BucketSpec,b:BucketSpec)=>a.color-b.color||a.capacity-b.capacity,
+    (a:BucketSpec,b:BucketSpec)=>b.color-a.color||a.capacity-b.capacity,
+    (a:BucketSpec,b:BucketSpec)=>a.capacity-b.capacity,
+    (a:BucketSpec,b:BucketSpec)=>b.capacity-a.capacity,
+  ];
+  for(const compare of orders){
+    const attempt=greedy(level,speed,pause,true,compare);
+    if(attempt.game.status==='won')return replayDecisions(level,attempt.moves,speed,pause);
+  }
   const ids=allIds(level);let nodes=0,steps=0;
   type Node={game:Game;moves:Decision[]};
   let beam:Node[]=[{game:new Game(level),moves:[]}];

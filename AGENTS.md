@@ -39,3 +39,7 @@ Place behavior-focused tests in `tests/*.test.ts`. No numerical coverage thresho
 Fetch current `origin/main` before starting work and preserve existing local changes. Prefer `feat/<description>` branches and concise, imperative commit subjects; history does not enforce Conventional Commits.
 
 Describe the behavior changed, validation performed, and relevant issues. Include screenshots for visible UI changes. Obtain explicit user approval before merging. Pushes to `main` deploy through `.github/workflows/pages.yml`; preserve the `/sand-bucket/` base path and offline support.
+
+Every release must increase `package.json` and both root versions in `package-lock.json` together using `major.minor.patch`: patch for fixes, minor for new features. Bump once per release branch, not once per commit. Run `npm run check:version -- origin/main` before submitting. CI checks branches/PRs against current main and main pushes against the pre-push revision; unchanged or lower versions block deployment. Do not bypass this check.
+
+`npm run campaign:verify-playable` checks existing levels with merged gameplay colors, reuses cached proofs when valid and finds new solutions when needed, without changing layouts or capacities. Run it before releasing any artwork or campaign changes; campaign generation also certifies the merged colors. Verified solutions are saved separately under `.cache/playable/`. A failure blocks releasing the color change; do not regenerate automatically.

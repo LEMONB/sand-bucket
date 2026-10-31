@@ -112,7 +112,6 @@ export class FieldView {
       const panel=surface(p.cells,'platform-surface');
       panel.dataset.upper=String(p.next.length>0);
       if(wasUpper&&!p.next.length)this.animate(panel,[{transform:'translateY(5px) scale(.97)'},{transform:'translateY(-2px) scale(1.01)',offset:.65},{transform:'none'}],450);
-      if(p.next.length){const colors=document.createElement('span');colors.className='platform-next';colors.innerHTML=nextBuckets(game,p.next,p.hidden);panel.append(colors);}
     });
     game.mechanics.trays.forEach(t=>{const panel=surface(t,'tray-surface');panel.innerHTML=gameIcon('rotate');if(rotated)this.animate(panel,[{transform:'rotate(-90deg)'},{transform:'rotate(0deg)'}],400);});
     game.mechanics.gates.forEach(g=>{const panel=surface(g.cells,'gate-surface');panel.innerHTML=gameIcon('lock');panel.style.color=keyColor(game,g.key);});
