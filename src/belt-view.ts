@@ -33,7 +33,7 @@ export class BeltView {
     // At most five launches plus recent completions; reuse a bounded visual pool.
     for(let i=0;i<20;i++) {
       const element=document.createElement('div');element.className='flying-bucket';element.hidden=true;element.setAttribute('aria-hidden','true');
-      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><span class="sparkles">✦ · ✧</span>`;document.body.append(element);
+      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><small class="completion-label">100%</small><span class="sparkles">✦ · ✧</span>`;document.body.append(element);
       const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');document.body.append(rope);
       this.effects.push({element,rope,x:0,y:0,active:false,started:0});
     }
@@ -52,7 +52,7 @@ export class BeltView {
   reset(): void { this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.rope.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
   draw(game: Game, seconds: number, speed:Speed=1): void {
-    this.clock+=seconds*2;this.sandClock+=seconds*speed;
+    this.clock+=seconds;this.sandClock+=seconds*speed;
     for(const event of game.events) {
       if(event.type==='arrive')continue;
       if(event.type==='collect') {

@@ -57,6 +57,8 @@
 .slot-bucket { transform-origin: 50% 90%; }
 .completion-fill { display: none; position: absolute; bottom: 8px; left: 13px; width: 22px; height: 24px; border-radius: 3px; background: #fff2c7bb; }
 .completion .completion-fill { display: block; }
+.completion-label { display: none; position: absolute; top: 28px; left: 0; width: 100%; text-align: center; font-size: 8px; font-weight: 700; color: #36554a; }
+.completion .completion-label { display: block; }
 @media(prefers-reduced-motion: reduce) { .mock-fill { transition: none; } }
 
 .overlay:not([hidden]) .result { animation: result-enter 300ms cubic-bezier(.22,.7,.25,1); }
