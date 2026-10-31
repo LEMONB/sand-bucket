@@ -32,7 +32,9 @@
 .mock-field .bucket-shape { width: min(78%, 42px); height: 86%; }
 .mock-field .is-blocked .bucket-shape { transform: rotate(180deg) scale(.7); }
 .mock-wall { margin: 18% 12%; border-radius: 5px; background: linear-gradient(#aeb7a6 0 45%, #929e8c 46% 51%, #a3af9b 52%); box-shadow: inset 0 2px #c4cbbd, 0 2px #83917d; }
-.flying-bucket { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); aspect-ratio: 64 / 68; }
+.bucket-effects { position: fixed; top: 0; bottom: 0; overflow: hidden; pointer-events: none; z-index: 30; }
+.bucket-effects .flying-yoke { position: absolute; }
+.flying-bucket { position: absolute; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); aspect-ratio: 64 / 68; }
 .flying-bucket svg { width: 100%; height: 100%; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media(prefers-reduced-motion: reduce) { .slot-bucket.is-complete { animation: none; opacity: .5; } }

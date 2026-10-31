@@ -5,8 +5,9 @@ import { BELT_LIMIT, LAUNCH_TICKS, LOOP_TICKS, type Game, type GameEvent, type S
 
 export class BeltView {
   private readonly views: { slot: HTMLElement; bucket: HTMLElement; fill: HTMLElement; label: HTMLElement; id: number; percent: number; marks: HTMLElement }[][] = [];
-  private readonly effects: { element: HTMLElement; rope: HTMLElement; x:number; y:number; active: boolean; event?: GameEvent; started: number }[] = [];
+  private readonly effects: { element: HTMLElement; wrap: HTMLElement; rope: HTMLElement; x:number; y:number; active: boolean; event?: GameEvent; started: number }[] = [];
   private readonly stream = document.createElement('canvas');
+  private readonly effectsLayer = document.createElement('div');
   private readonly streamContext = this.stream.getContext('2d')!;
   private readonly grains = Array.from({ length: 120 }, () => ({ active: false, born: 0, x: 0, y: 0, slot: 0, color: 1, jitter: 0 }));
   private nextGrain = 0;
@@ -19,6 +20,7 @@ export class BeltView {
   private grainSize = 32;
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
   constructor(private belt: HTMLElement, private field: HTMLElement, private sand: HTMLElement) {
+    this.effectsLayer.className='bucket-effects';document.body.append(this.effectsLayer);
     this.stream.className = 'sand-stream'; this.stream.setAttribute('aria-hidden', 'true'); document.body.append(this.stream);
     for(let slot=0;slot<BELT_LIMIT;slot++) {
       const views=[];
@@ -33,13 +35,15 @@ export class BeltView {
     // At most five launches plus recent completions; reuse a bounded visual pool.
     for(let i=0;i<20;i++) {
       const element=document.createElement('div');element.className='flying-bucket';element.hidden=true;element.setAttribute('aria-hidden','true');
-      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><small class="completion-label">100%</small><span class="sparkles">✦ · ✧</span>`;document.body.append(element);
-      const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');document.body.append(rope);
-      this.effects.push({element,rope,x:0,y:0,active:false,started:0});
+      element.innerHTML=`${bucketIcon}<span class="belt-marks"></span><i class="completion-fill"></i><small class="completion-label">100%</small><span class="sparkles">✦ · ✧</span>`;this.effectsLayer.append(element);
+      const wrap=element.cloneNode(true) as HTMLElement;this.effectsLayer.append(wrap);
+      const rope=document.createElement('div');rope.className='pair-yoke flying-yoke';rope.innerHTML=yokeIcon;rope.hidden=true;rope.setAttribute('aria-hidden','true');this.effectsLayer.append(rope);
+      this.effects.push({element,wrap,rope,x:0,y:0,active:false,started:0});
     }
   }
   measure(): void {
     this.beltRect=this.belt.getBoundingClientRect();
+    this.effectsLayer.style.left=`${this.beltRect.left}px`;this.effectsLayer.style.width=`${this.beltRect.width}px`;
     this.sandRect=this.sand.getBoundingClientRect();
     this.streamTop=this.sandRect.bottom-this.sandRect.height*5/128-8;
     this.stream.width=Math.ceil(this.beltRect.width);
@@ -49,7 +53,7 @@ export class BeltView {
     const shape=this.field.querySelector('.bucket-shape');
     if(shape)this.grainSize=shape.getBoundingClientRect().width;
   }
-  reset(): void { this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.rope.hidden=true;} }
+  reset(): void { this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.wrap.hidden=true;effect.rope.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
   draw(game: Game, seconds: number, speed:Speed=1): void {
     this.clock+=seconds;this.sandClock+=seconds*speed;
@@ -70,6 +74,7 @@ export class BeltView {
       effect.element.querySelector('.belt-marks')!.innerHTML=bucketMarks(game,event.bucket);
       effect.element.classList.toggle('completion',event.type==='complete');
       effect.element.style.width=`${event.type==='complete'?48:this.grainSize}px`;
+      effect.wrap.innerHTML=effect.element.innerHTML;effect.wrap.className=effect.element.className;
     }
     game.events.length=0;
     for(let slot=0;slot<BELT_LIMIT;slot++) {
@@ -114,6 +119,9 @@ export class BeltView {
         scale=1+Math.sin(t*Math.PI)*.12-lift*lift*.35;scaleY=scale;
         opacity=1-lift*lift;
       }else{
+        // Keep the destination continuous while its slot crosses the conveyor seam.
+        const start=((event.tick%LOOP_TICKS)/LOOP_TICKS+event.slot/BELT_LIMIT)%1;
+        end.x=this.beltRect.left+(start+(game.tick-event.tick)/LOOP_TICKS)*this.beltRect.width;
         const path=event.path!;
         const mouth={x:this.cells[path[path.length-1]].x,y:this.beltRect.bottom+4};
         const points=[...path.map(i=>this.cells[i]),mouth,end];
@@ -126,9 +134,13 @@ export class BeltView {
         scaleY=1+Math.sin(t*Math.PI)*.035;
       }
       effect.x=x;effect.y=y;
-      effect.element.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) rotate(${this.reduced.matches?0:angle}deg) scale(${this.reduced.matches?1:scale},${this.reduced.matches?1:scaleY})`;
+      effect.element.style.transform=`translate(${x-this.beltRect.left}px,${y}px) translate(-50%,-50%) rotate(${this.reduced.matches?0:angle}deg) scale(${this.reduced.matches?1:scale},${this.reduced.matches?1:scaleY})`;
       effect.element.style.opacity=String(this.reduced.matches?(complete?opacity:0):opacity);
-      if(t>=1){effect.active=false;effect.element.hidden=true;}
+      effect.wrap.style.cssText=effect.element.style.cssText;
+      const wrapX=x-this.beltRect.left+(x<this.beltRect.left+this.beltRect.width/2?this.beltRect.width:-this.beltRect.width);
+      effect.wrap.style.transform=effect.element.style.transform.replace(/^translate\([^)]*\)/,`translate(${wrapX}px,${y}px)`);
+      effect.wrap.hidden=false;
+      if(t>=1){effect.active=false;effect.element.hidden=true;effect.wrap.hidden=true;}
     }
     for(const effect of this.effects){
       const partnerId=effect.event?.partnerId;
@@ -137,7 +149,7 @@ export class BeltView {
       effect.rope.hidden=!visible;
       if(visible){
         const dx=partner!.x-effect.x,dy=partner!.y-effect.y;
-        Object.assign(effect.rope.style,{left:`${effect.x}px`,top:`${effect.y-19}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
+        Object.assign(effect.rope.style,{left:`${effect.x-this.beltRect.left}px`,top:`${effect.y-19}px`,width:`${Math.hypot(dx,dy)}px`,transform:`rotate(${Math.atan2(dy,dx)}rad)`});
       }
     }
   }
