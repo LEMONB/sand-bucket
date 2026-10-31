@@ -26,7 +26,7 @@ export function layoutFor(number:number,attempt:number):GenerationProfile & {fam
   }
   // Leave room for mechanisms; their regions cannot overlap permanent walls.
   const kinds=campaignKinds(number);
-  if(kinds.includes(2)||kinds.includes(3)||kinds.includes(4)){
+  if(kinds.includes(2)||kinds.includes(3)){
     for(const cell of [...walls])if(cell%columns>=columns-2&&Math.floor(cell/columns)>=columns-2)walls.delete(cell);
   }
   return {columns,kinds,walls:[...walls].sort((a,b)=>a-b),family};

@@ -11,7 +11,7 @@ export function campaignKinds(number: number): number[] {
     const second = wave <= 8 ? focus - 1 : (focus + 5) % 8;
     kinds.push(second);
   }
-  return kinds;
+  return kinds.filter(kind=>kind!==4);
 }
 export function campaignColumns(number: number): number {
   return [4, 5, 5, 6, 4][campaignPhase(number)] + Number(number > 200);

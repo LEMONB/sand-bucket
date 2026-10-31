@@ -31,11 +31,11 @@ for(const number of [1,4,7,9]) {
 }
 it.each([1,2,3,4,5,6,7,8])('introduces mechanic %i with a certified playable level',number=>{
   const level=generateLevel(number);
-  expect(level.kinds).toEqual([number-1]);
+  expect(level.kinds).toEqual(number===5?[]:[number-1]);
   expect(replay(asLevel(level),level.solution).status).toBe('won');
 },30000);
-it.each([11,14,17,20,23,26,29,32])('certifies a combination of two mechanics at level %i',number=>{
- const level=generateLevel(number);expect(level.kinds).toHaveLength(2);
+it.each([11,14,17,20,23,26,29,32])('certifies the remaining mechanics at level %i',number=>{
+ const level=generateLevel(number);expect(level.kinds).toHaveLength([29,32].includes(number)?1:2);expect(level.kinds).not.toContain(4);
  expect(replay(asLevel(level),level.solution).status).toBe('won');
 },30000);
 it.each([15,24])('certifies three mechanic instances, eight colors and both speeds at level %i',number=>{

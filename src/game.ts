@@ -172,7 +172,6 @@ export class Game {
       const [a,b,c,d] = t;
       if (t.length !== 4 || a % this.columns === this.columns-1 || b !== a+1 || c !== b+this.columns || d !== a+this.columns || t.some(i => this.walls.has(i) || this.field[i]?.swapWith!==undefined)) throw new Error('Неверный поднос');
     }
-    for (const b of this.mechanics.bridges) { region(b.cells); region(b.passage); if (b.passage.some(i=>this.field[i]) || b.cells.some(i=>!this.field[i])) throw new Error('Неверный мост'); }
     for (const g of this.mechanics.gates) { region(g.cells); if (!ids.has(g.key) || g.cells.some(i=>this.field[i])) throw new Error('Неверный замок'); }
     const linked = new Set<number>();
     for (const pair of this.mechanics.links) {
@@ -193,7 +192,6 @@ export class Game {
   refreshField(): void {
     const walls = new Set(this.walls);
     this.mechanics.gates.forEach(g=>g.cells.forEach(i=>walls.add(i)));
-    this.mechanics.bridges.forEach(b=>b.passage.forEach(i=>walls.add(i)));
     this.paths = exitPaths(this.field, this.columns, walls);
     for(const index of this.paths.keys())this.revealed.add(this.field[index]!.id);
     this.fieldRevision++;
@@ -212,7 +210,6 @@ export class Game {
     for (const p of this.mechanics.platforms) if (p.next.length && p.cells.every(i=>!this.field[i])) {
       p.cells.forEach((i,j)=>{this.field[i]=p.next[j];}); p.next=[];
     }
-    this.mechanics.bridges = this.mechanics.bridges.filter(b=>!b.cells.every(i=>!this.field[i]));
     for (const cells of this.mechanics.trays) {
       const buckets=cells.map(i=>this.field[i]);
       cells.forEach((i,j)=>{this.field[i]=buckets[(j+3)%4];});
@@ -271,7 +268,7 @@ export class Game {
       this.field[position]=null;
     }
     this.turns++;
-    const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.bridges.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.swapWith!==undefined));
+    const changes=this.mechanics.queues.length+this.mechanics.platforms.length+this.mechanics.trays.length+Number(this.field.some(b=>b?.swapWith!==undefined));
     if(changes) { this.pendingField=true; this.busyUntil=this.motionTick+LAUNCH_TICKS+10; }
     this.refreshField();
     return 'ok';

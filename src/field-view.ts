@@ -51,8 +51,7 @@ export class FieldView {
     };
     const blocked=new Set(game.walls);
     game.mechanics.gates.forEach(g=>g.cells.forEach(i=>blocked.add(i)));
-    game.mechanics.bridges.forEach(b=>b.passage.forEach(i=>blocked.add(i)));
-    const surfaceCells=new Set([...game.mechanics.platforms.flatMap(p=>p.cells),...game.mechanics.trays.flat(),...game.mechanics.bridges.flatMap(b=>b.cells)]);
+    const surfaceCells=new Set([...game.mechanics.platforms.flatMap(p=>p.cells),...game.mechanics.trays.flat()]);
     const nextPositions=new Map<number,number>();
     for(const [i,button] of this.buttons.entries()){
       const bucket=game.field[i];
@@ -115,7 +114,6 @@ export class FieldView {
     });
     game.mechanics.trays.forEach(t=>{const panel=surface(t,'tray-surface');panel.innerHTML=gameIcon('rotate');if(rotated)this.animate(panel,[{transform:'rotate(-90deg)'},{transform:'rotate(0deg)'}],400);});
     game.mechanics.gates.forEach(g=>{const panel=surface(g.cells,'gate-surface');panel.innerHTML=gameIcon('lock');panel.style.color=keyColor(game,g.key);});
-    game.mechanics.bridges.forEach(b=>surface(b.cells,'bridge-surface'));
     game.mechanics.links.forEach(pair=>{
       const indexes=pair.map(id=>game.field.findIndex(b=>b?.id===id));
       if(indexes.some(i=>i<0))return;
@@ -133,7 +131,6 @@ export class FieldView {
       const base=element.style.transform||'none';
       let frames:Keyframe[]=[{opacity:1,transform:base},{opacity:0,transform:base}];
       if(key.startsWith('lid:'))frames=[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-24px) rotate(-8deg) scale(.94)'}];
-      if(key.startsWith('bridge-surface')){element.style.transformOrigin='50% 0';frames=[{opacity:1,transform:'scaleY(1)'},{opacity:.7,transform:'scaleY(.2)',offset:.65},{opacity:0,transform:'scaleY(0)'}];}
       if(key.startsWith('gate-surface'))frames=[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-12px) scale(.8)'}];
       if(key.startsWith('pair:'))frames=[{opacity:1,transform:base},{opacity:0,transform:`${base} scaleX(.15)`}];
       element.style.zIndex='3';

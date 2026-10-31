@@ -12,9 +12,9 @@ it('recreates the same candidate and eight proofs from the same inputs',async()=
  expect(first.proofs).toHaveLength(8);
 },30000);
 
-it('introduces all eight mechanics in waves, with a quiet fifth level',()=>{
+it('introduces active mechanics in waves, with a quiet fifth level',()=>{
  expect(Array.from({length:10},(_,i)=>campaignPhase(i+1))).toEqual([0,1,2,3,4,0,1,2,3,4]);
- expect(Array.from({length:8},(_,i)=>campaignKinds(6+i*5)[0])).toEqual([0,1,2,3,4,5,6,7]);
+ expect(Array.from({length:8},(_,i)=>campaignKinds(6+i*5)[0])).toEqual([0,1,2,3,undefined,5,6,7]);
  for(let n=5;n<=400;n+=5)expect(campaignKinds(n)).toEqual([]);
 });
 it('constructs repeatable distinct geometry for the four appearances of an artwork',()=>{
