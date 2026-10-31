@@ -6,6 +6,8 @@ import { Game, HEIGHT, WIDTH, advanceFrame, type Speed } from '../src/game';
 class ElementStub {
   style: Record<string, string> = {};
   hidden = false;
+  width = 0;
+  height = 0;
   innerHTML = '';
   textContent = '';
   className = '';
@@ -20,7 +22,7 @@ class ElementStub {
   }
   cloneNode(): ElementStub { const copy = new ElementStub();copy.innerHTML = this.innerHTML;return copy; }
   get firstElementChild(): ElementStub { return this.querySelector('first'); }
-  getBoundingClientRect(): DOMRect { return { left: 0, top: 0, bottom: 200, width: 300, height: 200 } as DOMRect; }
+  getBoundingClientRect(): DOMRect { return { left: 0, right: 300, top: 0, bottom: 200, width: 300, height: 200 } as DOMRect; }
   getContext(): object { return { clearRect() {}, fillRect() {} }; }
 }
 afterEach(() => vi.unstubAllGlobals());
@@ -39,7 +41,7 @@ function fixture(speed: Speed, reduced: boolean, tick = 0) {
   const buckets = Array(16).fill(null);buckets[0] = { id: 0, color: 1, capacity: 1 };
   const game = new Game({ cells, field: buckets });
   game.tick = tick;view.measure();game.launch(0);view.draw(game, 0, speed);
-  return { body, effects: body.children[0], belt, view, game };
+  return { body, effects: body.children[0], sand, belt, view, game };
 }
 
 it.each([1, 2] as const)('shows completion for a real .8 seconds when filling on arrival at speed %i', speed => {
@@ -83,4 +85,15 @@ it.each([1, 2] as const)('keeps a launch continuous across the belt seam at spee
   expect(crossed).toBe(true);expect(flying.hidden).toBe(true);expect(wrap.hidden).toBe(true);
   expect(game.slots[0]?.filled).toBe(0);expect(belt.children[0].firstElementChild.hidden).toBe(false);
   expect(previous).toBeCloseTo(300+game.slotPosition(0)*300);
+});
+
+
+it('covers both sand and belt when the landscape layout places them side by side', () => {
+  const { body, sand, belt, view } = fixture(1, false);
+  sand.getBoundingClientRect = () => ({ left: 20, right: 220, top: 100, bottom: 300, width: 200, height: 200 } as DOMRect);
+  belt.getBoundingClientRect = () => ({ left: 240, right: 600, top: 82, bottom: 150, width: 360, height: 68 } as DOMRect);
+  view.measure();
+  const stream = body.children.find(e => e.className === 'sand-stream')!;
+  expect(stream.width).toBe(580);expect(stream.height).toBe(218);
+  expect(stream.style.left).toBe('20px');expect(stream.style.top).toBe('82px');
 });

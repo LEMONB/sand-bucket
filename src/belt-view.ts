@@ -13,6 +13,7 @@ export class BeltView {
   private nextGrain = 0;
   private sandRect!: DOMRect;
   private streamTop = 0;
+  private streamLeft = 0;
   private clock = 0;
   private sandClock = 0;
   private beltRect!: DOMRect;
@@ -45,10 +46,11 @@ export class BeltView {
     this.beltRect=this.belt.getBoundingClientRect();
     this.effectsLayer.style.left=`${this.beltRect.left}px`;this.effectsLayer.style.width=`${this.beltRect.width}px`;
     this.sandRect=this.sand.getBoundingClientRect();
-    this.streamTop=this.sandRect.bottom-this.sandRect.height*5/128-8;
-    this.stream.width=Math.ceil(this.beltRect.width);
-    this.stream.height=Math.ceil(this.beltRect.bottom-this.streamTop);
-    this.stream.style.left=`${this.beltRect.left}px`;this.stream.style.top=`${this.streamTop}px`;
+    this.streamLeft=Math.min(this.sandRect.left,this.beltRect.left);
+    this.streamTop=Math.min(this.sandRect.bottom-this.sandRect.height*5/128-8,this.beltRect.top);
+    this.stream.width=Math.ceil(Math.max(this.sandRect.right,this.beltRect.right)-this.streamLeft);
+    this.stream.height=Math.ceil(Math.max(this.sandRect.bottom,this.beltRect.bottom)-this.streamTop);
+    this.stream.style.left=`${this.streamLeft}px`;this.stream.style.top=`${this.streamTop}px`;
     this.cells=[...this.field.children].map(element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
     const shape=this.field.querySelector('.bucket-shape');
     if(shape)this.grainSize=shape.getBoundingClientRect().width;
@@ -62,7 +64,7 @@ export class BeltView {
       if(event.type==='collect') {
         for(let i=0;i<Math.min(3,event.amount!);i++) {
           const grain=this.grains[this.nextGrain++%this.grains.length];
-          Object.assign(grain,{active:true,born:this.sandClock-i*.025,x:this.sandRect.left+4+event.from!.x*(this.sandRect.width-8)-this.beltRect.left,
+          Object.assign(grain,{active:true,born:this.sandClock-i*.025,x:this.sandRect.left+4+event.from!.x*(this.sandRect.width-8)-this.streamLeft,
             y:this.sandRect.top+4+event.from!.y*(this.sandRect.height-8)-this.streamTop,slot:event.slot,color:event.bucket.color,jitter:(i-1)*3});
         }
         continue;
@@ -98,7 +100,7 @@ export class BeltView {
       if(!grain.active)continue;
       const t=(this.sandClock-grain.born)/.22;
       if(t>=1){grain.active=false;continue;}
-      const targetX=game.slotPosition(grain.slot)*this.beltRect.width;
+      const targetX=this.beltRect.left+game.slotPosition(grain.slot)*this.beltRect.width-this.streamLeft;
       const targetY=this.beltRect.top+25-this.streamTop;
       const x=this.reduced.matches?targetX:grain.x+(targetX-grain.x)*t+grain.jitter*Math.sin(t*Math.PI);
       const y=this.reduced.matches?targetY:grain.y+(targetY-grain.y)*t*t;
