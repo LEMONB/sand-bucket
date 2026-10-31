@@ -2,7 +2,7 @@ name: Check and deploy
 
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: ['**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,10 +15,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+      - name: Require a new release version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$REF_NAME" = "refs/heads/main" ] && [ "$EVENT_NAME" = "push" ]; then
+            base="$BEFORE_SHA"
+          elif [ "$REF_NAME" = "refs/heads/main" ]; then
+            base="HEAD^"
+          else
+            git fetch origin main
+            base="origin/main"
+          fi
+          npm run check:version -- "$base"
       - run: npm ci
       - run: npm run check
         env:

@@ -66,3 +66,6 @@
 .overlay.is-win:not([hidden]) .result-icon { animation: victory-accent 600ms cubic-bezier(.22,.7,.25,1); }
 @keyframes victory-accent { 0% { transform: scale(.5) rotate(-20deg); opacity: 0; } 60% { transform: scale(1.18) rotate(6deg); opacity: 1; } 100% { transform: none; } }
 @media(prefers-reduced-motion: reduce) { .overlay.is-win:not([hidden]) .result-icon { animation: none; } }
+
+#app:has(#update-note:not([hidden])) .mock-sand { width: min(100%, max(110px, calc(100svh - 510px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))); }
+#app:not(.playing) { overflow-y: auto; }

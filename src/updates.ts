@@ -22,7 +22,7 @@ export class GameUpdates {
   private reloading = false;
   private checking: Promise<void> | null = null;
   private registration?: ServiceWorkerRegistration;
-  constructor(private idleDestination: () => UpdateDestination | null, private attempted: string | null, private status: (text: string) => void) {}
+  constructor(private idleDestination: () => UpdateDestination | null, private attempted: string | null, private status: (text: string) => void, private updateReady: (ready: boolean) => void = () => {}) {}
 
   apply(destination: UpdateDestination): boolean {
     if (this.reloading) return true;
@@ -41,6 +41,7 @@ export class GameUpdates {
       clearTimeout(timer); channel.port1.close();
       if (controller !== navigator.serviceWorker.controller || typeof event.data?.buildId !== 'string') return;
       this.pending = event.data.buildId === __BUILD_ID__ ? null : event.data.buildId;
+      this.updateReady(!!this.pending && this.pending !== this.attempted);
       const destination = this.idleDestination();
       if (!document.hidden && destination) this.apply(destination);
     };

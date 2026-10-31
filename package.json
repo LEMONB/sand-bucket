@@ -1,7 +1,7 @@
 {
   "name": "sand-bucket",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -16,6 +16,8 @@
     "test:full": "SAND_BUCKET_FULL_TESTS=1 vitest run",
     "campaign:pilot": "node --experimental-strip-types scripts/prepare-campaign.ts --pilot",
     "campaign:generate": "node --experimental-strip-types scripts/prepare-campaign.ts --all",
+    "campaign:verify-playable": "node --experimental-strip-types scripts/prepare-campaign.ts --verify-playable",
+    "check:version": "node --experimental-strip-types scripts/check-version.ts",
     "campaign:verify": "node --experimental-strip-types scripts/prepare-campaign.ts --verify"
   },
   "dependencies": {

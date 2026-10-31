@@ -96,3 +96,24 @@ it('restores replay, next-level and menu destinations without unlocking levels',
   }
   expect(readUpdateResume(new URL('https://example.test/?_sb_update=b&_sb_level=400'), 13).destination).toBeNull();
 });
+
+it('announces a pending update separately from offline status without interrupting play', async () => {
+  destination = null; current = 'release-b';
+  const status = vi.fn(), ready = vi.fn();
+  const updates = new GameUpdates(() => destination, null, status, ready);
+  await updates.start();
+  expect(ready).toHaveBeenLastCalledWith(true);
+  expect(status).toHaveBeenCalledWith('Можно играть без интернета');
+  expect(replace).not.toHaveBeenCalled();
+  current = __BUILD_ID__;
+  serviceWorker.dispatchEvent(new Event('controllerchange'));
+  expect(ready).toHaveBeenLastCalledWith(false);
+});
+it('does not announce the current build or an already attempted update', async () => {
+  const ready = vi.fn();
+  await new GameUpdates(() => destination, null, () => {}, ready).start();
+  expect(ready).toHaveBeenLastCalledWith(false);
+  current = 'release-b'; destination = null;
+  await new GameUpdates(() => destination, 'release-b', () => {}, ready).start();
+  expect(ready).toHaveBeenLastCalledWith(false);
+});

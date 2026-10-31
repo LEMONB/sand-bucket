@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { asLevel, generateCandidate, seedFor } from '../../src/generator.ts';
+import { mergeArtworkColors } from '../../src/campaign-art.ts';
 import { Game } from '../../src/game.ts';
 import type { CampaignLevel } from '../../src/campaign-types.ts';
 import { layoutFor } from './layout.ts';
@@ -17,7 +18,7 @@ export function prepare(number:number,attempt:number):CandidateResult {
   let generationMs=0;const started=performance.now();
   try {
     const profile=layoutFor(number,attempt),seed=(seedFor(number)+Math.imul(attempt,104729))>>>0;
-    const generated=generateCandidate(number,seed,profile),level=asLevel(generated);
+    const generated=generateCandidate(number,seed,profile),level=mergeArtworkColors(asLevel(generated));
     balancePauses(level);
     const game=new Game(level);
     if(game.paths.size===0)throw Error('Нет входа');

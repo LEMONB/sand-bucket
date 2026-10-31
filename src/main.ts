@@ -21,7 +21,7 @@ let storage: Pick<Storage,'getItem'|'setItem'>;
 try { storage=localStorage; } catch { storage={getItem(){throw Error();},setItem(){throw Error();}}; }
 const progress=new ProgressStore(storage);
 const root=document.querySelector<HTMLDivElement>('#app')!;
-root.innerHTML=`<section id="menu" class="menu" aria-label="Главное меню">
+root.innerHTML=`<p id="update-note" class="update-note" role="status" hidden>Обновление готово. Применится при переходе в меню или запуске уровня.</p><section id="menu" class="menu" aria-label="Главное меню">
 <header class="brand"><span class="brand-mark">${bucketIcon}</span><span>SAND BUCKET</span></header>
 <div class="intro"><span class="eyebrow">МАЛЕНЬКАЯ ПАУЗА</span><h1>Всё течёт.<br><span>Песок тоже.</span></h1><p>Новый узор. Знакомое спокойствие.</p></div>
 <div class="level-card"><div class="preview-wrap"><canvas id="preview" width="128" height="128" aria-hidden="true"></canvas><span id="menu-number" class="level-badge"></span></div><div class="level-description"><h2 id="menu-title"></h2><span id="menu-difficulty" class="level-state"></span></div></div>
@@ -177,7 +177,7 @@ setSpeed(speed);menu();
 if(import.meta.env.PROD){
   updates=new GameUpdates(()=>!visible&&!loading?{level:selectedLevel,play:false}:null,resume.attempted,text=>{
     if(progress.available)el('offline-note').textContent=text;
-  });
+  },ready=>{ el('update-note').hidden=!ready; });
   void updates.start();
 }
 if(puzzleScenario||lossScenario||devLevel||resume.destination?.play)void start();
