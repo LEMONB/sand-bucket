@@ -11,7 +11,7 @@ import { balancePauses, certify, type Proof } from './solver.ts';
 export interface CandidateResult { level?:CampaignLevel; proofs?:Proof[]; error?:string; generationMs:number; certificationMs:number; signature?:string; pressure?:number; retainedLayout?:boolean }
 export function topology(level:CampaignLevel):string {
   const n=level.columns,walls=new Set(level.walls);
-  const shape=(mirror:boolean)=>Array.from({length:n*n},(_,i)=>{
+  const shape=(mirror:boolean)=>Array.from({length:level.field.length},(_,i)=>{
     const p=Math.floor(i/n)*n+(mirror?n-1-i%n:i%n);
     return walls.has(p)?'#':level.field[p]?'B':'.';
   }).join('');

@@ -17,20 +17,20 @@ import { changedSince, playableKey, readVerified, verificationHash, verification
 
 import { assertCapacities, capacityRanges, normalizeCapacities } from './campaign/capacities.ts';
 const root=new URL('../',import.meta.url);
-const args=process.argv.slice(2),rebalance=args.includes('--rebalance-capacities');
-const source=rebalance?JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog:undefined;
+const args=process.argv.slice(2),rebalance=args.includes('--rebalance-capacities'),refreshSwaps=args.includes('--refresh-swaps');
+const source=rebalance||refreshSwaps?JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog:undefined;
 if(source&&(source.version!==CAMPAIGN_VERSION||source.levels.length!==CAMPAIGN_COUNT||source.levels.some((l,i)=>l.number!==i+1||l.art!==i%100)))throw Error('Исходный каталог неполон');
 const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts','scripts/campaign/capacities.ts','scripts/campaign/swap-capacities.ts'];
 const fingerprint=createHash('sha256');for(const file of files)fingerprint.update(file).update(readFileSync(new URL(file,root)));
 const hash=fingerprint.digest('hex');
-const migrationHash=source?createHash('sha256').update(hash).update(JSON.stringify(source)).update(readFileSync(new URL('scripts/prepare-campaign.ts',root))).update(readFileSync(new URL('scripts/campaign-worker.ts',root))).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).update(readFileSync(new URL('scripts/campaign/verification.ts',root))).digest('hex'):undefined;
+const migrationHash=source?createHash('sha256').update(hash).update(JSON.stringify(source)).update(String(refreshSwaps)).update(readFileSync(new URL('scripts/prepare-campaign.ts',root))).update(readFileSync(new URL('scripts/campaign-worker.ts',root))).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).update(readFileSync(new URL('scripts/campaign/verification.ts',root))).digest('hex'):undefined;
 const directory=new URL(migrationHash?`.cache/capacities/${migrationHash}/`:`.cache/campaign/${hash}/`,root);
 const catalogFingerprint=createHash('sha256').update(hash).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).digest('hex');
 mkdirSync(directory,{recursive:true});
 const pilot=args.includes('--pilot'),mergedColors=args.includes('--verify-playable'),verify=args.includes('--verify')||mergedColors;
-const options=verificationOptions(args,CAMPAIGN_COUNT);
-if(args.filter(arg=>['--pilot','--verify','--verify-playable','--all','--rebalance-capacities'].includes(arg)).length!==1)throw Error('Выберите один режим проверки или генерации');
-if(!pilot&&!verify&&!rebalance&&!args.includes('--all'))throw Error('Укажите --pilot, --all, --verify или --verify-playable');
+const options=verificationOptions(args.filter(arg=>arg!=='--refresh-swaps'),CAMPAIGN_COUNT);
+if(args.filter(arg=>['--pilot','--verify','--verify-playable','--all','--rebalance-capacities','--refresh-swaps'].includes(arg)).length!==1)throw Error('Выберите один режим проверки или генерации');
+if(!pilot&&!verify&&!rebalance&&!refreshSwaps&&!args.includes('--all'))throw Error('Укажите --pilot, --all, --verify или --verify-playable');
 const proofDirectory=new URL(`.cache/playable/${hash}/`,root);
 const certificateDirectory=new URL('.cache/playable/verified/',root);
 const checkerHash=verificationHash(file=>readFileSync(new URL(file,root),'utf8'));
@@ -84,7 +84,7 @@ async function run(number:number,attempt:number):Promise<CandidateResult>{
   let result:CandidateResult|undefined;
   if(attempt===-1){
     try{
-      const original=source!.levels[number-1],playable=normalizeCapacities(playableLevel(original));
+      const original=source!.levels[number-1],playable=refreshSwaps?playableLevel(original):normalizeCapacities(playableLevel(original));
       const key=createHash('sha256').update(checkerHash).update(playableKey(playable)).digest('hex');
       const proofs=readVerified(new URL(key+'.json',certificateDirectory),key);
       if(proofs){const level={...original,field:playable.field,mechanics:playable.mechanics};result={level,proofs,signature:topology(level),retainedLayout:true,generationMs:0,certificationMs:0,pressure:Math.max(...proofs.map(p=>p.peakSlots))};certificateHits++;}
@@ -170,10 +170,12 @@ try{
   }else{
     // Keep workers occupied; accept results in level order for deterministic deduplication.
     const pending=numbers.map(async number=>{
-      for(let attempt=rebalance?-1:0;attempt<24;attempt++){
+      const retain=rebalance||(refreshSwaps&&!source!.levels[number-1].field.some(b=>b?.swapWith!==undefined));
+      for(let attempt=retain?-1:0;attempt<24;attempt++){
         const result=await run(number,attempt);
         if(result.level&&!duplicate(result))return {number,attempt,result};
         failures.push({number,attempt,error:result.error??'Повтор планировки'});
+        if(refreshSwaps&&retain)break;
       }
       return {number,attempt:24,result:undefined};
     });
@@ -209,6 +211,10 @@ try{
     }
   }
   if(!pilot&&!verify){
+    if(refreshSwaps)for(const result of results){
+      const original=source!.levels[result.level!.number-1];
+      if(!original.field.some(b=>b?.swapWith!==undefined)&&JSON.stringify(original)!==JSON.stringify(result.level))throw Error('Изменён уровень без переключателей');
+    }
     const catalog:CampaignCatalog={version:CAMPAIGN_VERSION,fingerprint:catalogFingerprint,levels:results.map(r=>r.level!)};
     const temp=new URL('src/levels/campaign.tmp',root);writeFileSync(temp,JSON.stringify(catalog)+'\n');renameSync(temp,new URL('src/levels/campaign.json',root));
   }

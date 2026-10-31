@@ -14,5 +14,9 @@ export function campaignKinds(number: number): number[] {
   return kinds.filter(kind=>kind!==4);
 }
 export function campaignColumns(number: number): number {
-  return [4, 5, 5, 6, 4][campaignPhase(number)] + Number(number > 200);
+  return [6, 7, 7, 8, 6][campaignPhase(number)] + Number(number > 200);
+}
+
+export function campaignRows(number: number): number {
+  return campaignColumns(number) - 3;
 }

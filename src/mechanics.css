@@ -43,11 +43,13 @@
 .flying-yoke { position: fixed; z-index: 29; }
 .belt-marks .bucket-roles { right: -7px; top: 0; }
 
-.queue-dispenser { position: absolute; inset: 2px; border: 1px solid #8fa799; border-radius: 8px; background: linear-gradient(#c2d0c4 0 16px, #e3e9dc 16px); box-shadow: inset 0 -3px #aabdab; }
-.queue-dispenser::before { content: ''; position: absolute; inset: 17px 5px 5px; border-radius: 3px; background: #b6c7b6; box-shadow: inset 0 2px 2px #59796830; }
-.queue-dispenser::after { content: ''; position: absolute; top: 6px; left: 40%; right: 16%; height: 3px; border-radius: 2px; background: #789184; }
-.bucket-extra .queue-count { top: 4px; left: 6px; right: auto; z-index: 2; min-width: 14px; font: 700 10px/14px system-ui; color: #365c4e; text-align: center; }
-.mock-field .is-dispenser .bucket-shape { position: relative; z-index: 1; align-self: end; margin-bottom: 8px; width: min(58%, 32px); height: calc(100% - 30px); }
+.queue-dispenser { position: absolute; left: 3%; right: 3%; bottom: 1%; height: 18%; border: 1px solid #809c8d; border-radius: 4px; background: linear-gradient(#c8d7c5 0 45%, #9eb69f 45%); box-shadow: 0 2px 0 #799580; }
+.queue-dispenser::before { content: ''; position: absolute; left: 39%; right: 39%; bottom: 100%; height: 55%; border: 1px solid #839e8a; border-bottom: 0; border-radius: 2px 2px 0 0; background: #b5c8b2; }
+.queue-dispenser::after { content: ''; position: absolute; top: -2px; left: 12%; right: 12%; height: 3px; border-radius: 3px; background: #6c8d78; }
+.bucket-extra .queue-count { top: auto; bottom: -1px; right: -1px; z-index: 2; min-width: 12px; padding: 0 2px; border-radius: 4px; background: #dce5d6; font: 700 9px/12px system-ui; color: #365c4e; text-align: center; }
+.mock-field .is-dispenser .bucket-shape { position: relative; z-index: 1; }
 .is-dispenser .bucket-roles { z-index: 2; }
 .is-dispenser.is-empty::after { display: none; }
 .is-dispenser.is-empty .queue-dispenser { opacity: .55; }
+
+.mock-field .bucket-roles .game-icon, .mock-field .bucket-mark .game-icon { width: calc(18px * var(--field-scale, 1)); height: calc(18px * var(--field-scale, 1)); }

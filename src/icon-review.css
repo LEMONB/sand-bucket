@@ -33,7 +33,7 @@ h3 span { font-size: 9px; letter-spacing: 1px; color: #8b968a; font-weight: 500;
 .hidden-example { border-top: 1px dashed #d7dece; margin: 0 12px; padding-top: 12px; }
 .bucket { position: absolute; width: 60px; height: 66px; z-index: 2; }
 .bucket > svg { display: block; width: 100%; height: 100%; }
-.inverted { transform: rotate(180deg) scale(.7); }
+.inverted { transform: rotate(180deg); }
 .after .inverted .badge { top: 26px; left: 13px; right: auto; transform: rotate(180deg); color: #38554b !important; }
 .old-mark { position: absolute; top: 33px; width: 100%; text-align: center; color: #fffaf2; font: bold 22px/1 sans-serif; text-shadow: 0 1px 2px #29483e; }
 .badge { display: grid; place-items: center; width: 34px; height: 34px; background: transparent; }

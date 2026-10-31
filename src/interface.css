@@ -1,23 +1,23 @@
 html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-#app { width: min(100%, 440px); padding: 0 12px; height: 100svh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+#app { position: relative; width: min(100%, 440px); padding: 0 12px; height: 100svh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .demo-sizes { display: flex; justify-content: center; gap: 6px; flex-shrink: 0; height: 42px; align-items: center; border-bottom: 1px solid #dde1d3; }
 .demo-sizes button { border: 0; border-radius: 9px; background: transparent; color: #7b8e7d; padding: 6px 12px; font-size: 12px; }
 .demo-sizes button[aria-pressed=true] { color: #f9f7ed; background: #416858; }
-.mock-game { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
-.mock-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 46px; }
+.mock-game { position: relative; z-index: 1; flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.mock-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 44px; }
 .mock-brand { font-size: 10px; font-weight: 750; letter-spacing: 1.6px; }
 #difficulty { margin-left: auto; font-size: 11px; color: #829080; }
 .mock-header .icon-button { flex-shrink: 0; margin-left: -8px; background: none; border: 0; font-size: 27px; }
-.mock-status { display: flex; align-items: center; gap: 10px; height: 36px; flex-shrink: 0; font-size: 10px; font-weight: 600; }
+.mock-status { display: flex; align-items: center; gap: 10px; height: 28px; flex-shrink: 0; font-size: 10px; font-weight: 600; }
 .mock-status progress { flex: 1; margin: 0; }
 #demo-count { white-space: nowrap; }
-#demo-speed { width: 44px; height: 44px; padding: 8px; border: 0; background: transparent; color: #446353; flex-shrink: 0; }
-#demo-speed span { display: grid; place-items: center; height: 26px; border-radius: 8px; background: #e4e9db; font-size: 11px; font-weight: 700; }
-#demo-speed[aria-pressed=true] span { background: #315c4d; color: #fffbed; }
-.belt-row { position: relative; flex-shrink: 0; padding-bottom: 24px; }
-.belt-row .mock-belt { width: calc(100% * var(--belt-scale, 1)); margin: 0 auto; }
-.belt-row #demo-speed { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 68px; height: 24px; padding: 3px; display: grid; place-items: center; z-index: 5; }
-.belt-row #demo-speed span { width: 52px; height: 18px; min-height: 0; font-size: 11px; line-height: 18px; border-radius: 999px; box-shadow: inset 0 1px 0 #ffffff26; }
+.belt-row { position: relative; flex-shrink: 0; margin: 10px 0 30px; }
+.belt-row .mock-belt { width: 100%; margin: 0; }
+.belt-row #demo-speed { position: absolute; left: 50%; top: calc(100% - 24px); transform: translateX(-50%); width: 96px; height: 44px; padding: 0; border: 0; background: transparent; color: #36554a; font: 700 11px system-ui; z-index: 5; }
+.speed-shape { position: absolute; left: 0; top: 22px; width: 96px; height: 22px; fill: #d8ded5; pointer-events: none; }
+.belt-row #demo-speed span { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); padding: 0 12px; line-height: 16px; border-radius: 8px; }
+.belt-row #demo-speed[aria-pressed=true] span { color: #fffaf2; background: #315c4d; }
+.belt-row #demo-speed:focus-visible { outline: 2px solid #328a80; outline-offset: 2px; border-radius: 12px; }
 
 .mock-sand { position: relative; min-height: 0; width: min(100%, calc(100svh - 426px - env(safe-area-inset-bottom))); aspect-ratio: 1; flex: 0 0 auto; align-self: center; margin: 5px 0 8px; }
 .mock-sand canvas { position: absolute; inset: 0; display: block; height: 100%; width: 100%; min-width: 0; object-fit: fill; image-rendering: pixelated; border: 4px solid #fffaf2; outline: 1px solid #e0ded3; border-radius: 8px; }
@@ -28,10 +28,10 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .mock-fill { position: absolute; bottom: calc(7px * var(--belt-scale, 1)); left: calc(13px * var(--belt-scale, 1)); width: calc(22px * var(--belt-scale, 1)); height: calc(24px * var(--belt-scale, 1) * var(--fill)); background: #fff2c7bb; border-radius: calc(3px * var(--belt-scale, 1)); }
 .slot-bucket.is-complete { animation: complete .28s ease-out forwards; }
 @keyframes complete { 35% { transform: translateY(-7px) scale(1.15); filter: brightness(1.15); } 100% { transform: translateY(-18px) scale(.7); opacity: 0; } }
-.mock-field { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); grid-template-rows: repeat(var(--columns), minmax(0, 1fr)); gap: 2px; padding: 5px; flex: 1; min-height: 0; border-radius: 16px; background: #eeeee3; }
+.mock-field { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, var(--columns)), minmax(0, 1fr)); gap: 2px; padding: 6px; min-height: 0; }
 .mock-field .field-bucket { height: 100%; min-width: 0; border-radius: 8px; }
-.mock-field .bucket-shape { width: min(78%, 42px); height: 86%; }
-.mock-field .is-blocked .bucket-shape { transform: rotate(180deg) scale(.7); }
+.mock-field .bucket-shape { width: 80%; height: 80%; }
+.mock-field .is-blocked .bucket-shape { transform: rotate(180deg); }
 .mock-wall { margin: 18% 12%; border-radius: 5px; background: linear-gradient(#aeb7a6 0 45%, #929e8c 46% 51%, #a3af9b 52%); box-shadow: inset 0 2px #c4cbbd, 0 2px #83917d; }
 .bucket-effects { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 30; }
 .bucket-effect { position: absolute; inset: 0; }
@@ -43,17 +43,21 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 /* Production keeps the approved layout, without the preview size selector. */
 #app:not(:has(.demo-sizes)):not(.playing) { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 #app.playing { padding-top: env(safe-area-inset-top); }
-/* Reserve the actual bucket rows; the square uses only the remaining space. */
-.sand-space { flex: 1; min-height: 0; margin: 5px 0 16px; container-type: size; display: grid; place-items: center; }
-#app.playing .mock-sand { width: min(100cqw, 100cqh); margin: 0; background: #ebe6db; border: 4px solid #fffaf2; border-radius: 8px; outline: 1px solid #e0ded3; }
+/* Keep portrait artwork square; scale the belt and bucket grid together. */
+.sand-space { flex: none; width: 100%; aspect-ratio: 1; display: grid; place-items: center; }
+#field-space { flex: 1; min-height: 0; display: grid; place-items: center; }
+#field-walls { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#app:not(.playing) #field-walls { display: none; }
+#app.playing .solid-wall::before { display: none; }
+#app.playing .mock-sand { width: 100%; margin: 0; background: #ebe6db; border: 4px solid #fffaf2; border-radius: 8px; outline: 1px solid #e0ded3; }
 #app.playing .mock-sand canvas { width: 100% !important; height: 100% !important; border: 0; border-radius: 4px; }
-#app.playing .mock-field { margin-top: 0; flex: 0 0 calc(var(--columns) * 50px + 8px); grid-template-rows: repeat(var(--columns), minmax(0, 1fr)); }
+#app.playing .mock-field { margin-top: 0; flex: none; grid-template-rows: repeat(var(--rows), minmax(0, 1fr)); }
 #app.playing #home { margin-left: 0; font-size: 28px; }
 #app.playing .mock-brand { letter-spacing: 1px; font-size: 9px; }
 #app.playing .mock-slot { left: 0; }
 #app.playing .flying-bucket { left: 0; top: 0; }
 .flying-bucket { left: 0; top: 0; will-change: transform, opacity; }
-.slot-bucket small { position: absolute; top: calc(28px * var(--belt-scale, 1)); left: 0; width: 100%; text-align: center; font-size: 8px; font-weight: 700; color: #36554a; }
+.slot-bucket small { position: absolute; top: calc(28px * var(--belt-scale, 1)); left: 0; width: 100%; text-align: center; font-size: calc(8px * var(--belt-scale, 1)); font-weight: 700; color: #36554a; }
 .sparkles { display: none; position: absolute; top: calc(-8px * var(--belt-scale, 1)); left: calc(-8px * var(--belt-scale, 1)); width: calc(66px * var(--belt-scale, 1)); text-align: center; color: #d0ac48; font-size: calc(20px * var(--belt-scale, 1)); }
 .completion .sparkles { display: block; }
 .sand-stream { position: fixed; z-index: 4; pointer-events: none; }
@@ -102,18 +106,19 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   .menu .menu-note { grid-area: 4 / 1; margin: 0; align-self: center; }
   .menu .app-version { grid-area: 4 / 2; margin: 0 auto; }
   .menu .offline-note { grid-column: 1 / -1; margin: 0; }
-  .mock-game { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: max(46px, calc(68px * var(--belt-scale, 1) + 24px)) 36px minmax(0, 1fr); column-gap: 12px; }
+  .mock-game { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: max(44px, calc(68px * var(--belt-scale, 1) + 30px)) 28px minmax(0, 1fr); column-gap: 12px; }
   .mock-header { grid-area: 1 / 1; }
   .mock-status { grid-area: 2 / 1; }
-  .sand-space { grid-area: 3 / 1; margin: 0; }
-  .belt-row { grid-area: 1 / 2; }
-  #app.playing .mock-field { grid-area: 2 / 2 / 4 / 3; }
+  .sand-space { grid-area: 3 / 1; margin: 0; aspect-ratio: auto; min-height: 0; container-type: size; }
+  #app.playing .mock-sand { width: min(100cqw, 100cqh); }
+  .belt-row { grid-area: 1 / 2; margin-top: 0; }
+  #field-space { grid-area: 2 / 2 / 4 / 3; }
 }
 
 @media (display-mode: standalone) {
   /* A solid pinned header gives iOS a surface for its status-bar edge effect. */
   #app.playing { padding-top: 0; }
-  #app.playing .mock-header { position: sticky; top: 0; z-index: 6; height: calc(46px + env(safe-area-inset-top)); margin: 0 -12px; padding: env(safe-area-inset-top) 12px 0; background: #f5f1e9; }
+  #app.playing .mock-header { position: sticky; top: 0; z-index: 6; height: calc(44px + env(safe-area-inset-top)); margin: 0 -12px; padding: env(safe-area-inset-top) 12px 0; background: #f5f1e9; }
 }
 @media (display-mode: standalone) and (min-width: 600px) and (max-height: 500px) {
   #app.playing { padding-top: env(safe-area-inset-top); }
@@ -123,3 +128,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .belt-marks .bucket-roles .game-icon { width: calc(18px * var(--belt-scale, 1)); height: calc(18px * var(--belt-scale, 1)); }
 
 .mock-belt .belt-marks .bucket-roles, .bucket-effects .belt-marks .bucket-roles { right: calc(-7px * var(--belt-scale, 1)); }
+
+.level-info { display: flex; flex-direction: column; gap: 2px; }
+#app .update-note { display: flex; align-items: center; gap: 4px; padding: 0; margin: 0; border: 0; background: none; color: #6a7862; font-size: 9px; font-weight: 400; line-height: 12px; white-space: nowrap; }
+#app .update-note::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #69aa91; }
+#menu-update-note { justify-content: center; }
+
+#app:has(.demo-sizes) .mock-field { flex: 1; background: #eeeee3; }
+.mock-status #demo-speed { position: static; width: 44px; height: 44px; border-radius: 12px; }
