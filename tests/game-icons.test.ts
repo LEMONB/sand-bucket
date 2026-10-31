@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Game, WIDTH, HEIGHT } from '../src/game';
-import { bucketMarks, keyColor, nextBuckets } from '../src/game-icons';
+import { bucketMarks, keyColor } from '../src/game-icons';
 
 function fixture(): Game {
   const cells = new Uint8Array(WIDTH * HEIGHT);
@@ -17,14 +17,6 @@ it('keeps both key and lid marks and masks a hidden key color', () => {
   expect(marks).toContain('icon-lid');
   expect(marks).not.toContain(game.palette[bucket.color]);
   expect(keyColor(game, bucket.id)).toBe('#9ba49e');
-});
-
-it('masks future colors independently for a hidden layer and a hidden bucket', () => {
-  const game = fixture();
-  const bucket = { id: 20, color: 2, capacity: 1 };
-  expect(nextBuckets(game, [bucket], true)).not.toContain(game.palette[2]);
-  expect(nextBuckets(game, [{ ...bucket, hidden: true }])).not.toContain(game.palette[2]);
-  expect(nextBuckets(game, [bucket])).toContain(game.palette[2]);
 });
 
 it('does not expose a hidden swap partner through its arrow color', () => {

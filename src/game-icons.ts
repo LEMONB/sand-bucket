@@ -1,4 +1,3 @@
-import { bucketIcon } from './bucket-icon';
 import type { BucketSpec, Game } from './game';
 
 const paths = {
@@ -26,10 +25,6 @@ export function bucketMarks(game: Game, bucket: BucketSpec, hidden = false): str
     marks += `<span style="color:${nextColor}">${gameIcon('swap')}</span><small class="swap-number">${Math.min(bucket.id,bucket.swapWith)+1}</small>`;
   }
   return `<span class="bucket-roles" style="color:${color}">${marks}</span>`;
-}
-
-export function nextBuckets(game: Game, buckets: BucketSpec[], hidden = false): string {
-  return buckets.map(b => `<i class="next-bucket" style="color:${hidden || b.hidden ? '#9ba49e' : game.palette[b.color]}">${bucketIcon}${hidden || b.hidden ? '<b>?</b>' : ''}</i>`).join('');
 }
 
 export function keyColor(game: Game, id: number): string {

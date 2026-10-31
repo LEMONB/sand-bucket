@@ -1,6 +1,6 @@
 import { trayPosition } from './bucket-motion';
 import { bucketIcon } from './bucket-icon';
-import { bucketMarks, gameIcon, keyColor, nextBuckets, yokeIcon } from './game-icons';
+import { bucketMarks, gameIcon, keyColor, yokeIcon } from './game-icons';
 import { COLOR_NAMES, PALETTE, type Game } from './game';
 
 export function wallConnections(index:number,columns:number,walls:ReadonlySet<number>):string[] {
@@ -65,18 +65,19 @@ export class FieldView {
       button.style.gridColumn=String(i%game.columns+1);button.style.gridRow=String(Math.floor(i/game.columns)+1);
       const shape=button.querySelector<HTMLElement>('.bucket-shape')!,mark=button.querySelector<HTMLElement>('.bucket-mark')!,extra=button.querySelector<HTMLElement>('.bucket-extra')!;
       if(button.dataset.bucket!==String(bucket?.id)){shape.getAnimations().forEach(a=>a.cancel());button.dataset.bucket=String(bucket?.id);}
-      mark.textContent='';extra.innerHTML='';
-      if(!bucket){button.setAttribute('aria-label',blocked.has(i)?'Закрытый проход':'Пустое место');continue;}
+      const queue=game.mechanics.queues.find(q=>q.cell===i);
+      const remaining=(queue?.buckets.length??0)+Number(!!bucket);
+      button.classList.toggle('is-dispenser',!!queue);
+      mark.textContent='';extra.innerHTML=queue?`<span class="queue-dispenser" aria-hidden="true"></span>${remaining!==1?`<small class="queue-count" aria-hidden="true">${remaining}</small>`:''}`:'';
+      if(!bucket){button.setAttribute('aria-label',queue?`Диспенсер: осталось вёдер ${remaining}`:blocked.has(i)?'Закрытый проход':'Пустое место');continue;}
       button.style.setProperty('--color',hidden?'#9ba49e':game.palette[bucket.color]);
       nextPositions.set(bucket.id,i);
       const swapPartner=bucket.swapWith===undefined?undefined:game.field.find(b=>b?.id===bucket.swapWith);
       const key=game.mechanics.gates.some(g=>g.key===bucket.id),lid=game.mechanics.lids.some(l=>l.key===bucket.id);
       mark.innerHTML=hidden?gameIcon('mystery'):'';
-      const queue=game.mechanics.queues.find(q=>q.cell===i);
-      extra.innerHTML=bucketMarks(game,bucket,hidden);
-      if(queue?.buckets.length)extra.innerHTML+=`<span class="queue-colors">${nextBuckets(game,queue.buckets,queue.hidden)}</span><small class="queue-count">${queue.buckets.length+1}/5</small>`;
+      extra.innerHTML+=bucketMarks(game,bucket,hidden);
       const name=game.palette[1]===PALETTE[1]?COLOR_NAMES[bucket.color]:['','Тёмное','Бирюзовое','Песочное','Коралловое','Синее','Зелёное','Жёлтое','Фиолетовое'][bucket.color];
-      button.setAttribute('aria-label',`${hidden?'Скрытое':name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, в очереди ${queue.buckets.length+1}${queue.hidden&&queue.buckets.length?', цвета скрыты':''}`:''}`);
+      button.setAttribute('aria-label',`${hidden?'Скрытое':name} ведро ${bucket.id+1}, ${available?'доступно':'проход закрыт'}${key?', ключ':''}${lid?', открывает крышку':''}${swapPartner?`, обменивается цветом с ведром ${swapPartner.id+1} после хода`:''}${queue?`, диспенсер: осталось вёдер ${remaining}`:''}`);
       const old=this.positions.get(bucket.id);
       const base=available?'rotate(0deg) scale(1)':'rotate(180deg) scale(.7)';
       if(old!==undefined&&old!==i){
