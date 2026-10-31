@@ -2,14 +2,14 @@ import { emptyMechanics, type Mechanics } from './mechanics.ts';
 import type { BucketSpec } from './game.ts';
 
 export function mechanicsFor(number: number,columns=4): number[] {
-  if(number<=8)return [number-1];
+  if(number<=8)return number===5?[]:[number-1];
   if(number%9===0)return [];
   const first=(number-9)%8;
   const repeated=Math.floor((number-9)/8)%3===1;
   const second=repeated&&!(first===2&&columns===4)?first:[7,5,6,6,7,6,0,4][first];
   const kinds=[first,second];
   if(columns>=5&&number%3===0)kinds.push(1);
-  return kinds;
+  return kinds.filter(kind=>kind!==4);
 }
 
 export function arrangeMechanics(specs: BucketSpec[], order: number[], columns: number, kinds: number[], random:()=>number,walls:ReadonlySet<number>=new Set()): {field:(BucketSpec|null)[]; mechanics:Mechanics} {
@@ -25,10 +25,6 @@ export function arrangeMechanics(specs: BucketSpec[], order: number[], columns: 
   for(let n=0;n<kinds.filter(k=>k===0).length;n++){const [cell]=region(1,1);required.add(cell);mechanics.queues.push({cell,buckets:[]});}
   for(let n=0;n<kinds.filter(k=>k===2).length;n++){const cells=region(2,2);cells.forEach(i=>required.add(i));mechanics.platforms.push({cells,next:[]});}
   for(let n=0;n<kinds.filter(k=>k===3).length;n++){const [a,b,d,c]=region(2,2);[a,b,c,d].forEach(i=>required.add(i));mechanics.trays.push([a,b,c,d]);}
-  for(let n=0;n<kinds.filter(k=>k===4).length;n++){
-    const [a,b,c,d]=region(2,2);[a,b].forEach(i=>required.add(i));[c,d].forEach(i=>blocked.add(i));
-    mechanics.bridges.push({cells:[a,b],passage:[c,d]});
-  }
   const pairsOfCells:number[][]=[];
   for(let n=0;n<kinds.filter(k=>k===5).length;n++){const cells=region(2,1);pairsOfCells.push(cells);cells.forEach(i=>required.add(i));}
   for(let n=0;n<kinds.filter(k=>k===1).length;n++){const cells=region(1,1);cells.forEach(i=>blocked.add(i));mechanics.gates.push({cells,key:-1});}

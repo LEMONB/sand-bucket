@@ -3,7 +3,7 @@ import { catalogArtwork, artworkIndex, artworkPalette } from './art-catalog.ts';
 import { arrangeMechanics, mechanicsFor } from './level-mechanics.ts';
 import type { Mechanics } from './mechanics.ts';
 
-export const GENERATOR_VERSION = 6;
+export const GENERATOR_VERSION = 7;
 export const MAX_STEPS = 30_000;
 export const MAX_ATTEMPTS = 24;
 export interface Move { tick: number; bucketId: number }
@@ -96,7 +96,7 @@ export function solve(level: Level, delay = 0, speed:Speed=2): {game:Game;soluti
 export function rebalance(level:Level,failed:Game):boolean {
   const all=[...level.field,...(level.mechanics?.queues.flatMap(q=>q.buckets)??[]),...(level.mechanics?.platforms.flatMap(p=>p.next)??[])].filter((b):b is BucketSpec=>!!b);
   const later=[...failed.field,...failed.mechanics.queues.flatMap(q=>q.buckets),...failed.mechanics.platforms.flatMap(p=>p.next)].filter((b):b is BucketSpec=>!!b);
-  const reserved=new Set([...(level.walls??[]),...(level.mechanics?.trays.flat()??[]),...(level.mechanics?.gates.flatMap(g=>g.cells)??[]),...(level.mechanics?.bridges.flatMap(b=>[...b.cells,...b.passage])??[]),...(level.mechanics?.platforms.flatMap(p=>p.cells)??[]),...(level.mechanics?.queues.map(q=>q.cell)??[])]);
+  const reserved=new Set([...(level.walls??[]),...(level.mechanics?.trays.flat()??[]),...(level.mechanics?.gates.flatMap(g=>g.cells)??[]),...(level.mechanics?.platforms.flatMap(p=>p.cells)??[]),...(level.mechanics?.queues.map(q=>q.cell)??[])]);
   for(const partial of failed.buckets.filter(b=>b.filled>0&&b.filled<b.capacity).sort((a,b)=>b.filled/b.capacity-a.filled/a.capacity)){
     const original=all.find(b=>b.id===partial.id)!;
     if(original.swapWith!==undefined)continue;
@@ -212,7 +212,7 @@ function candidate(number: number, seed: number, random: () => number, fallbackC
     }
   }
   if(!checked)throw Error('Не удалось сбалансировать вместимости');
-  const protectedCells=new Set([...(mechanics?.trays.flat()??[]),...(mechanics?.gates.flatMap(g=>g.cells)??[]),...(mechanics?.bridges.flatMap(b=>b.passage)??[])]);
+  const protectedCells=new Set([...(mechanics?.trays.flat()??[]),...(mechanics?.gates.flatMap(g=>g.cells)??[])]);
   const spaces=field.flatMap((b,i)=>!b&&!walls.has(i)&&!protectedCells.has(i)?[i]:[]);
   const eligible=spaces.filter(i=>!usedPaths.has(i));
   for(let i=eligible.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[eligible[i],eligible[j]]=[eligible[j],eligible[i]];}

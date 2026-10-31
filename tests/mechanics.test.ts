@@ -32,11 +32,6 @@ it('reveals the next platform layer only after all upper buckets leave',()=>{
   game.launch(1);advance(game);expect(game.field.slice(0,2).map(b=>b?.id)).toEqual([2,3]);
   expect(game.mechanics.platforms[0].next).toHaveLength(0);
 });
-it('removes the whole bridge when its last bucket departs',()=>{
-  const game=new Game(fixture({0:bucket(0),1:bucket(1),8:bucket(2)},l=>{l.mechanics!.bridges=[{cells:[0,1],passage:[4,5]}];}));
-  game.launch(0);advance(game);expect(game.mechanics.bridges).toHaveLength(1);
-  game.launch(1);advance(game);expect(game.mechanics.bridges).toHaveLength(0);expect(game.paths.has(8)).toBe(true);
-});
 it('sends a linked pair as one turn, or the clicked bucket alone when one slot remains',()=>{
   const level=fixture({0:bucket(0),1:bucket(1)},l=>{l.mechanics!.links=[[0,1]];});
   const pair=new Game(level);pair.launch(1);expect(pair.slots.filter(Boolean).map(b=>b!.id)).toEqual([1,0]);expect(pair.turns).toBe(1);expect(pair.events.map(e=>e.partnerId)).toEqual([0,1]);

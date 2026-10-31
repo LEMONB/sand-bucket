@@ -22,7 +22,6 @@ export function structuralSignature(level:CampaignLevel):string {
       sorted(mechanics.queues.map(q=>[cell(q.cell),q.buckets.length,!!q.hidden])),
       sorted(mechanics.platforms.map(p=>[cells(p.cells),p.next.length,!!p.hidden])),
       sorted(mechanics.trays.map(cells)),
-      sorted(mechanics.bridges.map(b=>[cells(b.cells),cells(b.passage)])),
       sorted(mechanics.gates.map(g=>[cells(g.cells),position(g.key)])),
       sorted(mechanics.links.map(pair=>pair.map(position).sort((a,b)=>a-b))),
       sorted(mechanics.lids.map(l=>[position(l.key),l.x,l.y,l.width,l.height])),

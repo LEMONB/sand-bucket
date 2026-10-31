@@ -7,6 +7,7 @@ it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
  const signatures=new Set<string>(),mechanics=new Set<number>();
  for(let number=1;number<=400;number++){
    const record=campaignLevel(number);
+   expect(record.kinds).not.toContain(4);expect(record.mechanics?.bridges??[]).toEqual([]);
    expect(record.number).toBe(number);expect(record.art).toBe((number-1)%100);
    expect(record.family).toBe(Math.floor((number-1)/100));
    const level=playableLevel(record);
@@ -14,7 +15,7 @@ it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
    const signature=structuralSignature({...record,...level});expect(signatures.has(signature)).toBe(false);signatures.add(signature);
    record.kinds.forEach(k=>mechanics.add(k));
  }
- expect([...mechanics].sort()).toEqual([0,1,2,3,4,5,6,7,8]);
+ expect([...mechanics].sort()).toEqual([0,1,2,3,5,6,7,8]);
 });
 it('isolates retries and rejects out-of-range levels',()=>{
  const first=campaignLevel(1),expected=structuredClone(first);first.walls.push(999);first.field.fill(null);
