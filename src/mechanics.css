@@ -48,7 +48,7 @@
 .queue-dispenser::before { content: ''; position: absolute; inset: 17px 5px 5px; border-radius: 3px; background: #b6c7b6; box-shadow: inset 0 2px 2px #59796830; }
 .queue-dispenser::after { content: ''; position: absolute; top: 6px; left: 40%; right: 16%; height: 3px; border-radius: 2px; background: #789184; }
 .bucket-extra .queue-count { top: 4px; left: 6px; right: auto; z-index: 2; min-width: 14px; font: 700 10px/14px system-ui; color: #365c4e; text-align: center; }
-.mock-field .is-dispenser .bucket-shape { position: relative; z-index: 1; align-self: end; margin-bottom: 9%; width: min(58%, 32px); height: 62%; }
+.mock-field .is-dispenser .bucket-shape { position: relative; z-index: 1; align-self: end; margin-bottom: 8px; width: min(58%, 32px); height: calc(100% - 30px); }
 .is-dispenser .bucket-roles { z-index: 2; }
 .is-dispenser.is-empty::after { display: none; }
 .is-dispenser.is-empty .queue-dispenser { opacity: .55; }

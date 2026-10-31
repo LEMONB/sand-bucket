@@ -164,6 +164,7 @@ el('restart').addEventListener('click',()=>{if(!loading&&game.status==='playing'
 el('demo-speed').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')setSpeed(speed===1?2:1);});
 el('mechanic-help').addEventListener('click',()=>{if(visible&&!paused&&game.status==='playing')explainMechanics();});
 window.addEventListener('resize',()=>{if(visible){fieldView.resize(game);belt.measure();belt.draw(game,0,speed);}});
+window.addEventListener('scroll',()=>{if(visible){belt.measure();belt.draw(game,0,speed);}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape')pause();
