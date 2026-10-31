@@ -1,6 +1,7 @@
 import { expect,it } from 'vitest';
 import { campaignLevel,playableLevel } from '../src/campaign';
 import { Game } from '../src/game';
+import { assertCapacities } from '../scripts/campaign/capacities';
 import { structuralSignature } from '../scripts/campaign/selection';
 
 it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
@@ -11,6 +12,7 @@ it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
    expect(record.number).toBe(number);expect(record.art).toBe((number-1)%100);
    expect(record.family).toBe(Math.floor((number-1)/100));
    const level=playableLevel(record);
+   assertCapacities(level);
    expect(new Game(level).paths.size).toBeGreaterThan(0);
    const signature=structuralSignature({...record,...level});expect(signatures.has(signature)).toBe(false);signatures.add(signature);
    record.kinds.forEach(k=>mechanics.add(k));

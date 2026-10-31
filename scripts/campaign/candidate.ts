@@ -1,11 +1,14 @@
 import { performance } from 'node:perf_hooks';
 import { asLevel, generateCandidate, seedFor } from '../../src/generator.ts';
 import { mergeArtworkColors } from '../../src/campaign-art.ts';
+import { normalizeNewLayout } from './swap-capacities.ts';
+import { normalizeCapacities } from './capacities.ts';
+import { playableLevel } from '../../src/campaign-art.ts';
 import { Game } from '../../src/game.ts';
 import type { CampaignLevel } from '../../src/campaign-types.ts';
 import { layoutFor } from './layout.ts';
 import { balancePauses, certify, type Proof } from './solver.ts';
-export interface CandidateResult { level?:CampaignLevel; proofs?:Proof[]; error?:string; generationMs:number; certificationMs:number; signature?:string; pressure?:number }
+export interface CandidateResult { level?:CampaignLevel; proofs?:Proof[]; error?:string; generationMs:number; certificationMs:number; signature?:string; pressure?:number; retainedLayout?:boolean }
 export function topology(level:CampaignLevel):string {
   const n=level.columns,walls=new Set(level.walls);
   const shape=(mirror:boolean)=>Array.from({length:n*n},(_,i)=>{
@@ -18,8 +21,9 @@ export function prepare(number:number,attempt:number):CandidateResult {
   let generationMs=0;const started=performance.now();
   try {
     const profile=layoutFor(number,attempt),seed=(seedFor(number)+Math.imul(attempt,104729))>>>0;
-    const generated=generateCandidate(number,seed,profile),level=mergeArtworkColors(asLevel(generated));
+    const generated=generateCandidate(number,seed,profile);let level=mergeArtworkColors(asLevel(generated));
     balancePauses(level);
+    level=normalizeNewLayout(level);
     const game=new Game(level);
     if(game.paths.size===0)throw Error('Нет входа');
     if(number>=46){
@@ -37,4 +41,16 @@ export function prepare(number:number,attempt:number):CandidateResult {
     if(record.field.some(b=>b?.hidden)||record.mechanics?.queues.some(q=>q.hidden)||record.mechanics?.platforms.some(p=>p.hidden))record.kinds=[...record.kinds,8];
     return {level:record,proofs,generationMs,certificationMs:performance.now()-started-generationMs,signature:topology(record),pressure:Math.max(...proofs.map(p=>p.peakSlots))};
   }catch(error){return {error:error instanceof Error?error.message:String(error),generationMs:generationMs||performance.now()-started,certificationMs:generationMs?performance.now()-started-generationMs:0};}
+}
+
+export function preserveLayout(record:CampaignLevel):CandidateResult {
+  const started=performance.now();
+  try {
+    const level=normalizeCapacities(playableLevel(record));
+    new Game(level);
+    const proofs:Proof[]=[];
+    for(const speed of [1,2] as const)for(const pause of [0,120,1800,-1])proofs.push(certify(level,speed,pause));
+    const saved={...record,field:level.field,mechanics:level.mechanics};
+    return {level:saved,proofs,retainedLayout:true,generationMs:0,certificationMs:performance.now()-started,signature:topology(saved),pressure:Math.max(...proofs.map(p=>p.peakSlots))};
+  }catch(error){return {error:String(error),generationMs:0,certificationMs:performance.now()-started};}
 }

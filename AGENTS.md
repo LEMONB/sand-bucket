@@ -22,6 +22,7 @@ Use Node.js 22.12 or newer; CI uses Node.js 24.
 - `npm run preview`: serve the production build locally.
 - `npm run test:full`: manually run the extensive generator sweep.
 - `npm run campaign:pilot`: prepare 20 representative campaign positions.
+- `npm run campaign:rebalance`: normalize capacities in the existing catalog first; replace layouts only after failure, resume from cache, and publish only a complete verified batch.
 - `npm run campaign:generate`: prepare all 400 levels, resume from cache, and atomically publish a complete catalog.
 - `npm run campaign:verify-playable -- --changed origin/main`: verify affected gameplay inputs against the base revision; use `--levels 6,209` for an explicit subset and `--force` to replay despite cached success.
 - `npm run campaign:verify`: replay all catalog proofs from the preparation cache.
@@ -48,3 +49,5 @@ Every release must increase `package.json` and both root versions in `package-lo
 Successful verification results in `.cache/playable/verified/` are keyed by gameplay inputs and simulation/checker code. Keep UI text and generation metadata out of these dependencies; update `VERIFICATION_FILES` when adding runtime rule/checker dependencies. Cached results must cover both speeds and all four pause scenarios.
 
 Debug-only numbers and identifiers on buckets may be used during development, but must be removed before a production release. Keep only explicitly approved gameplay counters, such as the dispenser remainder and belt fill percentage. Check this during release review.
+
+Campaign bucket capacities must satisfy max <= 4 * min for each merged gameplay color, including queue and platform contents. Preserve positive integer capacities, per-color sand totals and equal swap-pair capacities. Apply the constraint after all preparation repairs and before certification; never weaken it or publish a partial catalog.
