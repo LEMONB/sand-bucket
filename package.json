@@ -1,7 +1,7 @@
 {
   "name": "sand-bucket",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -20,7 +20,8 @@
     "check:version": "node --experimental-strip-types scripts/check-version.ts",
     "campaign:verify": "node --experimental-strip-types scripts/prepare-campaign.ts --verify",
     "campaign:refresh-swaps": "node --experimental-strip-types scripts/prepare-campaign.ts --refresh-swaps",
-    "campaign:rebalance": "node --experimental-strip-types scripts/prepare-campaign.ts --rebalance-capacities"
+    "campaign:rebalance": "node --experimental-strip-types scripts/prepare-campaign.ts --rebalance-capacities",
+    "campaign:audit-capacities": "node --experimental-strip-types scripts/audit-capacities.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
