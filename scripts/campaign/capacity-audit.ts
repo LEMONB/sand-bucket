@@ -6,7 +6,11 @@ import { capacityGroups, capacityRanges, normalizeCapacities, assertCapacities }
 import { certify, replayDecisions, type Proof } from './solver.ts';
 
 export const FAST_FILL_SECONDS = 1;
-export interface FillTime { bucketId:number; color:number; capacity:number; pause:number; seconds:number }
+export { measureFills } from './capacity-measurements.ts';
+import type { FillTime } from './capacity-measurements.ts';
+import { measureLevel, auditCandidateKey, readAuditCache, writeAuditCache, type AuditCache } from './capacity-audit-cache.ts';
+import { readVerified, writeVerified, validProofs, playableKey } from './verification.ts';
+import { createHash } from 'node:crypto';
 export interface AuditResult {
   number:number;
   status:'unchanged'|'simple'|'fixed-pairs'|'unconfirmed';
@@ -23,23 +27,6 @@ export interface AuditResult {
   reason?:string;
 }
 
-export function measureFills(level:Level, proof:Proof):FillTime[] {
-  assert.equal(proof.speed,2);
-  const arrivals=new Map<number,number>(),fills:FillTime[]=[];
-  replayDecisions(level,proof.decisions,proof.speed,proof.pause,game=>{
-    for(const event of game.events){
-      if(event.type==='arrive')arrivals.set(event.bucket.id,event.tick);
-      if(event.type==='complete'){
-        const arrival=arrivals.get(event.bucket.id);
-        assert.notEqual(arrival,undefined,'Completion must follow arrival');
-        fills.push({bucketId:event.bucket.id,color:event.bucket.color,capacity:event.bucket.capacity,pause:proof.pause,seconds:(event.tick-arrival!+1)/120});
-      }
-    }
-  });
-  assert.equal(fills.length,[...capacityGroups(level).values()].flat().length);
-  return fills;
-}
-
 export function fastColors(level:Level, fills:FillTime[], seconds=FAST_FILL_SECONDS):Set<number> {
   const uneven=new Set(capacityRanges(level).filter(r=>r.max>2*r.min).map(r=>r.color));
   return new Set(fills.filter(f=>f.seconds<seconds&&uneven.has(f.color)).map(f=>f.color));
@@ -49,18 +36,32 @@ function capacities(level:Level):AuditResult['capacitiesBefore'] {
   return [...capacityGroups(level)].map(([color,buckets])=>({color,buckets:buckets.map(({id,capacity})=>({id,capacity}))}));
 }
 
-export function auditLevel(record:CampaignLevel, baseline:Proof[], seconds=FAST_FILL_SECONDS, measurements?:FillTime[]):AuditResult {
+export function auditLevel(record:CampaignLevel, baseline:Proof[], seconds=FAST_FILL_SECONDS, measurements?:FillTime[], cache?:AuditCache):AuditResult {
   const source=playableLevel(record);
   assertCapacities(source);
-  const before=measurements??baseline.filter(p=>p.speed===2).flatMap(p=>measureFills(source,p));
+  const before=measurements??measureLevel(source,baseline,cache);
   const colors=fastColors(source,before,seconds);
+  const key=cache?auditCandidateKey(source,baseline,colors,cache.hashes):undefined;
+  if(cache&&key){
+    const saved=readAuditCache<AuditResult>(cache.directory,'candidates',key);
+    if(saved&&['unchanged','simple','fixed-pairs','unconfirmed'].includes(saved.status)&&
+      (saved.status!=='simple'||(saved.candidate&&saved.after&&validProofs(saved.proofs)))){
+      cache.stats.candidateHits++;
+      return {...saved,number:record.number,before,candidate:saved.candidate?{...record,field:saved.candidate.field,mechanics:saved.candidate.mechanics}:undefined};
+    }
+    cache.stats.candidateRuns++;
+  }
+  const save=(result:AuditResult):AuditResult=>{
+    if(cache&&key)writeAuditCache(cache.directory,'candidates',key,result);
+    return result;
+  };
   const result:AuditResult={number:record.number,status:'unchanged',colors:[...colors].sort(),before,rangesBefore:capacityRanges(source),capacitiesBefore:capacities(source)};
-  if(!colors.size)return result;
+  if(!colors.size)return save(result);
   let level:Level;
   try { level=normalizeCapacities(source,colors); }
   catch(error){
     if(!String(error).includes('фиксированные пары'))throw error;
-    return {...result,status:'fixed-pairs',reason:String(error)};
+    return save({...result,status:'fixed-pairs',reason:String(error)});
   }
   assertCapacities(level,colors);
   const original=capacityGroups(source);
@@ -74,13 +75,18 @@ export function auditLevel(record:CampaignLevel, baseline:Proof[], seconds=FAST_
     }
   }
   new Game(level);
-  const proofs:Proof[]=[],failures:NonNullable<AuditResult['failures']>=[];
-  for(const proof of baseline){
+  const proofKey=cache?createHash('sha256').update(cache.hashes.verification).update(playableKey(level)).digest('hex'):undefined;
+  const proofFile=proofKey&&cache?new URL(`${proofKey}.json`,cache.certificates):undefined;
+  const cachedProofs=proofFile&&proofKey?readVerified(proofFile,proofKey):undefined;
+  if(cachedProofs&&cache)cache.stats.proofHits++;
+  const proofs:Proof[]=cachedProofs??[],failures:NonNullable<AuditResult['failures']>=[];
+  for(const proof of cachedProofs?[]:baseline){
     try {
       try { proofs.push(replayDecisions(level,proof.decisions,proof.speed,proof.pause)); }
       catch { proofs.push(certify(level,proof.speed,proof.pause)); }
     }catch(error){failures.push({speed:proof.speed,pause:proof.pause,reason:String(error)});}
   }
+  if(!failures.length&&proofFile&&proofKey&&!cachedProofs)writeVerified(proofFile,proofKey,proofs);
   const candidate={...record,field:level.field,mechanics:level.mechanics};
-  return {...result,status:failures.length?'unconfirmed':'simple',candidate,proofs,failures,rangesAfter:capacityRanges(level),capacitiesAfter:capacities(level),after:failures.length?undefined:proofs.filter(p=>p.speed===2).flatMap(p=>measureFills(level,p))};
+  return save({...result,status:failures.length?'unconfirmed':'simple',candidate,proofs,failures,rangesAfter:capacityRanges(level),capacitiesAfter:capacities(level),after:failures.length?undefined:measureLevel(level,proofs,cache)});
 }

@@ -16,11 +16,12 @@ import { MECHANIC_NAMES } from '../src/mechanic-help.ts';
 import { changedSince, playableKey, readVerified, verificationHash, verificationOptions, writeVerified, validProofs } from './campaign/verification.ts';
 
 import { assertCapacities, capacityRanges, normalizeCapacities } from './campaign/capacities.ts';
+import { campaignCapacityColors } from './campaign/capacity-policy.ts';
 const root=new URL('../',import.meta.url);
 const args=process.argv.slice(2),rebalance=args.includes('--rebalance-capacities'),refreshSwaps=args.includes('--refresh-swaps');
 const source=rebalance||refreshSwaps?JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog:undefined;
 if(source&&(source.version!==CAMPAIGN_VERSION||source.levels.length!==CAMPAIGN_COUNT||source.levels.some((l,i)=>l.number!==i+1||l.art!==i%100)))throw Error('Исходный каталог неполон');
-const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts','scripts/campaign/capacities.ts','scripts/campaign/swap-capacities.ts'];
+const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts','scripts/campaign/capacities.ts','scripts/campaign/swap-capacities.ts','scripts/campaign/capacity-policy.ts','scripts/campaign/capacity-targets.json'];
 const fingerprint=createHash('sha256');for(const file of files)fingerprint.update(file).update(readFileSync(new URL(file,root)));
 const hash=fingerprint.digest('hex');
 const migrationHash=source?createHash('sha256').update(hash).update(JSON.stringify(source)).update(String(refreshSwaps)).update(readFileSync(new URL('scripts/prepare-campaign.ts',root))).update(readFileSync(new URL('scripts/campaign-worker.ts',root))).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).update(readFileSync(new URL('scripts/campaign/verification.ts',root))).digest('hex'):undefined;
@@ -76,7 +77,7 @@ async function run(number:number,attempt:number):Promise<CandidateResult>{
       const saved=JSON.parse(readFileSync(file,'utf8')) as CandidateResult;
       if(typeof saved.error==='string'){cached++;return saved;}
       if(saved.level?.number===number&&saved.level.art===(number-1)%100&&validProofs(saved.proofs)&&saved.signature===topology(saved.level)){
-        new Game(playableLevel(saved.level));assertCapacities(playableLevel(saved.level));
+        new Game(playableLevel(saved.level));assertCapacities(playableLevel(saved.level),campaignCapacityColors(number));
         cached++;return selected(saved);
       }
     }catch{/* Recompute an interrupted cache record. */}
@@ -84,7 +85,7 @@ async function run(number:number,attempt:number):Promise<CandidateResult>{
   let result:CandidateResult|undefined;
   if(attempt===-1){
     try{
-      const original=source!.levels[number-1],playable=refreshSwaps?playableLevel(original):normalizeCapacities(playableLevel(original));
+      const original=source!.levels[number-1],playable=refreshSwaps?playableLevel(original):normalizeCapacities(playableLevel(original),campaignCapacityColors(number));
       const key=createHash('sha256').update(checkerHash).update(playableKey(playable)).digest('hex');
       const proofs=readVerified(new URL(key+'.json',certificateDirectory),key);
       if(proofs){const level={...original,field:playable.field,mechanics:playable.mechanics};result={level,proofs,signature:topology(level),retainedLayout:true,generationMs:0,certificationMs:0,pressure:Math.max(...proofs.map(p=>p.peakSlots))};certificateHits++;}
@@ -92,7 +93,7 @@ async function run(number:number,attempt:number):Promise<CandidateResult>{
   }
   if(!result){jobs++;result=await work<CandidateResult>({number,attempt,source:attempt===-1?source!.levels[number-1]:undefined});}
   if(result.level){
-    const playable=playableLevel(result.level);new Game(playable);assertCapacities(playable);
+    const playable=playableLevel(result.level);new Game(playable);assertCapacities(playable,campaignCapacityColors(result.level!.number));
     const original=source?.levels[number-1];
     if(original&&(['art','columns','family','kinds'] as const).some(key=>JSON.stringify(original[key])!==JSON.stringify(result!.level![key])))result={error:'Изменён профиль уровня',generationMs:result.generationMs,certificationMs:result.certificationMs};
     else{
@@ -109,6 +110,7 @@ try{
     const catalog=JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog;
     if((!mergedColors&&catalog.fingerprint!==catalogFingerprint)||catalog.version!==CAMPAIGN_VERSION||catalog.levels.length!==400)throw Error('Каталог устарел или неполон');
     for(const [index,level] of catalog.levels.entries()){
+      assertCapacities(playableLevel(level),campaignCapacityColors(level.number));
       if(level.number!==index+1||level.art!==(level.number-1)%100)throw Error('Нарушен порядок каталога');
     }
     if(mergedColors){
@@ -202,7 +204,7 @@ try{
   if(results.length!==numbers.length)throw Error('Неполная партия: каталог не изменён; причины в report.json');
   if(!verify){
     for(const result of results){
-      const level=result.level!,playable=playableLevel(level);new Game(playable);assertCapacities(playable);
+      const level=result.level!,playable=playableLevel(level);new Game(playable);assertCapacities(playable,campaignCapacityColors(level.number));
       if(!result.proofs)throw Error('Нет доказательств');
       const key=createHash('sha256').update(checkerHash).update(playableKey(playable)).digest('hex');
       writeVerified(new URL(key+'.json',certificateDirectory),key,result.proofs);
