@@ -15,31 +15,33 @@ export function capacityGroups(level: Pick<Level, 'field' | 'mechanics'>): Map<n
 export function capacityRanges(level: Pick<Level, 'field' | 'mechanics'>): { color: number; min: number; max: number }[] {
   return [...capacityGroups(level)].map(([color, buckets]) => ({ color, min: Math.min(...buckets.map(b => b.capacity)), max: Math.max(...buckets.map(b => b.capacity)) }));
 }
-export function assertCapacities(level: Pick<Level, 'field' | 'mechanics'>): void {
+export function assertCapacities(level: Pick<Level, 'field' | 'mechanics'>, tighterColors: ReadonlySet<number> = new Set()): void {
   for (const range of capacityRanges(level)) {
-    if (range.max > MAX_CAPACITY_RATIO * range.min) throw Error(`Цвет ${range.color}: вместимости ${range.min}–${range.max} превышают 4:1`);
+    const ratio = tighterColors.has(range.color) ? 2 : MAX_CAPACITY_RATIO;
+    if (range.max > ratio * range.min) throw Error(`Цвет ${range.color}: вместимости ${range.min}–${range.max} превышают ${ratio}:1`);
   }
 }
 
 // Work on a copy: an impossible fixed swap pair must not leave a half-rebalanced level.
-export function normalizeCapacities(source: Level): Level {
+export function normalizeCapacities(source: Level, tighterColors: ReadonlySet<number> = new Set()): Level {
   const level = structuredClone(source);
   for (const [color, buckets] of capacityGroups(level)) {
+    const ratio = tighterColors.has(color) ? 2 : MAX_CAPACITY_RATIO;
     const capacities = buckets.map(b => b.capacity);
-    if (Math.max(...capacities) <= MAX_CAPACITY_RATIO * Math.min(...capacities)) continue;
+    if (Math.max(...capacities) <= ratio * Math.min(...capacities)) continue;
     const free = buckets.filter(b => b.swapWith === undefined).sort((a, b) => a.id - b.id);
     const fixed = buckets.filter(b => b.swapWith !== undefined);
-    if (!free.length) throw Error(`Цвет ${color}: фиксированные пары не допускают 4:1`);
+    if (!free.length) throw Error(`Цвет ${color}: фиксированные пары не допускают ${ratio}:1`);
     const total = free.reduce((sum, b) => sum + b.capacity, 0);
-    const lower = Math.max(1, Math.ceil(total / (MAX_CAPACITY_RATIO * free.length)), ...fixed.map(b => Math.ceil(b.capacity / MAX_CAPACITY_RATIO)));
+    const lower = Math.max(1, Math.ceil(total / (ratio * free.length)), ...fixed.map(b => Math.ceil(b.capacity / ratio)));
     const upper = Math.min(Math.floor(total / free.length), ...fixed.map(b => b.capacity));
-    if (lower > upper) throw Error(`Цвет ${color}: фиксированные пары не допускают 4:1`);
-    const clamped = (capacity:number, low:number) => Math.max(low, Math.min(low * MAX_CAPACITY_RATIO, capacity));
+    if (lower > upper) throw Error(`Цвет ${color}: фиксированные пары не допускают ${ratio}:1`);
+    const clamped = (capacity:number, low:number) => Math.max(low, Math.min(low * ratio, capacity));
     // Find the interval that needs the least extra redistribution after clipping extremes.
     let lo=lower,hi=upper;
     while(lo<hi){const mid=Math.floor((lo+hi)/2);if(free.reduce((sum,b)=>sum+clamped(b.capacity,mid),0)<total)lo=mid+1;else hi=mid;}
     const cost=(low:number)=>free.reduce((sum,b)=>sum+Math.abs(clamped(b.capacity,low)-b.capacity),0)+Math.abs(total-free.reduce((sum,b)=>sum+clamped(b.capacity,low),0));
-    const low=lo>lower&&cost(lo-1)<=cost(lo)?lo-1:lo,high=low*MAX_CAPACITY_RATIO;
+    const low=lo>lower&&cost(lo-1)<=cost(lo)?lo-1:lo,high=low*ratio;
     for (const bucket of free) bucket.capacity = clamped(bucket.capacity,low);
     let remainder = total - free.reduce((sum, b) => sum + b.capacity, 0);
     for (const bucket of free) {
@@ -48,6 +50,6 @@ export function normalizeCapacities(source: Level): Level {
     }
     if (remainder) throw Error('Не удалось сохранить сумму вместимостей');
   }
-  assertCapacities(level);
+  assertCapacities(level, tighterColors);
   return level;
 }

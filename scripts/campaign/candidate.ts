@@ -3,6 +3,7 @@ import { asLevel, generateCandidate, seedFor } from '../../src/generator.ts';
 import { mergeArtworkColors } from '../../src/campaign-art.ts';
 import { normalizeNewLayout } from './swap-capacities.ts';
 import { normalizeCapacities } from './capacities.ts';
+import { campaignCapacityColors } from './capacity-policy.ts';
 import { playableLevel } from '../../src/campaign-art.ts';
 import { Game } from '../../src/game.ts';
 import type { CampaignLevel } from '../../src/campaign-types.ts';
@@ -23,7 +24,7 @@ export function prepare(number:number,attempt:number):CandidateResult {
     const profile=layoutFor(number,attempt),seed=(seedFor(number)+Math.imul(attempt,104729))>>>0;
     const generated=generateCandidate(number,seed,profile);let level=mergeArtworkColors(asLevel(generated));
     balancePauses(level);
-    level=normalizeNewLayout(level);
+    level=normalizeNewLayout(level,campaignCapacityColors(number));
     const game=new Game(level);
     if(game.paths.size===0)throw Error('Нет входа');
     if(number>=46){
@@ -46,7 +47,7 @@ export function prepare(number:number,attempt:number):CandidateResult {
 export function preserveLayout(record:CampaignLevel):CandidateResult {
   const started=performance.now();
   try {
-    const level=normalizeCapacities(playableLevel(record));
+    const level=normalizeCapacities(playableLevel(record),campaignCapacityColors(record.number));
     new Game(level);
     const proofs:Proof[]=[];
     for(const speed of [1,2] as const)for(const pause of [0,120,1800,-1])proofs.push(certify(level,speed,pause));

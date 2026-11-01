@@ -4,6 +4,7 @@ import { Game } from '../src/game';
 import { assertCapacities } from '../scripts/campaign/capacities';
 import { structuralSignature } from '../scripts/campaign/selection';
 import { campaignColumns, campaignRows } from '../src/campaign-rules';
+import { campaignCapacityColors } from '../scripts/campaign/capacity-policy';
 
 it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
  const signatures=new Set<string>(),mechanics=new Set<number>();
@@ -15,7 +16,8 @@ it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
    const level=playableLevel(record);
    expect(level.columns).toBe(campaignColumns(number));
    expect(level.field.length).toBe(campaignColumns(number)*campaignRows(number));
-   assertCapacities(level);
+   // Freeze the pre-rebalance selection: measuring the repaired catalog would hide regressions.
+   assertCapacities(level,campaignCapacityColors(number));
    expect(new Game(level).paths.size).toBeGreaterThan(0);
    const signature=structuralSignature({...record,...level});expect(signatures.has(signature)).toBe(false);signatures.add(signature);
    record.kinds.forEach(k=>mechanics.add(k));

@@ -30,7 +30,7 @@ function decision(game:Game,id:number,ids:number[]):Decision {
   const rest=remaining(game),bucket=game.field.find(b=>b?.id===id)!;
   return {bucketId:id,collected:game.collected,completed:ids.filter(id=>!rest.has(id)),exposed:exposed(game,bucket.color)};
 }
-export function replayDecisions(level:Level,decisions:Decision[],speed:Speed,pause:number):Proof {
+export function replayDecisions(level:Level,decisions:Decision[],speed:Speed,pause:number,onStep?:(game:Game)=>void):Proof {
   const game=new Game(level),completed=new Set<number>();let cursor=0,readyAt=-1,peakSlots=0,unproductive=0;
   const limit=tickLimit(level,pause);
   while(game.status==='playing'&&game.tick<limit){
@@ -46,6 +46,7 @@ export function replayDecisions(level:Level,decisions:Decision[],speed:Speed,pau
     peakSlots=Math.max(peakSlots,game.buckets.length);
     game.step(2/speed);
     for(const event of game.events)if(event.type==='complete')completed.add(event.bucket.id);
+    onStep?.(game);
     game.events.length=0;
   }
   if(game.status!=='won'||cursor!==decisions.length)throw Error('Решение с условиями ожидания не подтверждено');
