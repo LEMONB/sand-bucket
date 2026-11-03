@@ -21,7 +21,8 @@
     "campaign:verify": "node --experimental-strip-types scripts/prepare-campaign.ts --verify",
     "campaign:refresh-swaps": "node --experimental-strip-types scripts/prepare-campaign.ts --refresh-swaps",
     "campaign:rebalance": "node --experimental-strip-types scripts/prepare-campaign.ts --rebalance-capacities",
-    "campaign:audit-capacities": "node --experimental-strip-types scripts/audit-capacities.ts"
+    "campaign:audit-capacities": "node --experimental-strip-types scripts/audit-capacities.ts",
+    "campaign:audit-difficulty": "node --experimental-strip-types scripts/audit-difficulty.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
