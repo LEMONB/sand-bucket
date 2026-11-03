@@ -131,7 +131,7 @@ async function start():Promise<void> {
           menu();
         }
         if(!finished&&resultReady(game.status,belt.busy,lossElapsed)){
-          finished=true;sand.app.ticker.stop();
+          finished=true;
           if(game.status==='won'&&puzzleScenario)dialog('Уровень пройден!',PUZZLE_TITLES[puzzleScenario],'Повторить',reset);
           else if(game.status==='won'&&record.number===CAMPAIGN_COUNT)dialog('Все 400 уровней пройдены!','Можно вернуться к любимым рисункам.','Выбрать уровень',home);
           else if(game.status==='won')dialog('Уровень пройден!','Можно переходить к следующему уровню.','Следующий',()=>{selectedLevel=record.number+1;void start();});

@@ -15,6 +15,7 @@ export class BeltView {
   private streamTop = 0;
   private streamLeft = 0;
   private clock = 0;
+  private finishedOffset = 0;
   private sandClock = 0;
   private beltRect!: DOMRect;
   private cells: {x:number;y:number}[] = [];
@@ -58,10 +59,12 @@ export class BeltView {
     const shape=this.field.querySelector('.bucket-shape');
     if(shape)this.grainSize=shape.getBoundingClientRect().width;
   }
-  reset(): void { this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.wrap.hidden=true;effect.rope.hidden=true;} }
+  reset(): void { this.finishedOffset=0;this.views.flat().forEach(v=>{v.id=-1;});this.grains.forEach(g=>{g.active=false;});this.streamContext.clearRect(0,0,this.stream.width,this.stream.height);for(const effect of this.effects){effect.active=false;effect.element.hidden=true;effect.wrap.hidden=true;effect.rope.hidden=true;} }
   get busy(): boolean {return this.effects.some(e=>e.active);}
   draw(game: Game, seconds: number, speed:Speed=1): void {
     this.clock+=seconds;this.sandClock+=seconds*speed;
+    if(game.status!=='playing')this.finishedOffset=(this.finishedOffset+seconds*speed*60/LOOP_TICKS)%1;
+    const slotPosition=(slot:number)=>(game.slotPosition(slot)+this.finishedOffset)%1;
     for(const event of game.events) {
       if(event.type==='arrive')continue;
       if(event.type==='collect') {
@@ -83,7 +86,7 @@ export class BeltView {
     }
     game.events.length=0;
     for(let slot=0;slot<BELT_LIMIT;slot++) {
-      const position=game.slotPosition(slot),bucket=game.slots[slot];
+      const position=slotPosition(slot),bucket=game.slots[slot];
       const visible=bucket!==null&&game.motionTick>=bucket.arrivalTick;
       const percent=bucket?Math.floor(bucket.filled/bucket.capacity*100):0;
       for(let fragment=0;fragment<2;fragment++) {
@@ -103,7 +106,7 @@ export class BeltView {
       if(!grain.active)continue;
       const t=(this.sandClock-grain.born)/.22;
       if(t>=1){grain.active=false;continue;}
-      const targetX=this.beltRect.left+game.slotPosition(grain.slot)*this.beltRect.width-this.streamLeft;
+      const targetX=this.beltRect.left+slotPosition(grain.slot)*this.beltRect.width-this.streamLeft;
       const targetY=this.beltRect.top+25*this.beltScale-this.streamTop;
       const x=this.reduced.matches?targetX:grain.x+(targetX-grain.x)*t+grain.jitter*Math.sin(t*Math.PI);
       const y=this.reduced.matches?targetY:grain.y+(targetY-grain.y)*t*t;
@@ -115,7 +118,7 @@ export class BeltView {
       if(!effect.active)continue;
       const event=effect.event!,complete=event.type==='complete';
       const t=complete?Math.min((this.clock-effect.started)/.8,1):Math.min((game.motionTick-event.motionTick!)/LAUNCH_TICKS,1);
-      const end={x:this.beltRect.left+game.slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34*this.beltScale};
+      const end={x:this.beltRect.left+slotPosition(event.slot)*this.beltRect.width,y:this.beltRect.top+34*this.beltScale};
       let x=end.x,y=end.y,scale=1,scaleY=1,angle=0,opacity=1;
       if(complete){
         effect.element.style.width=`${48*this.beltScale}px`;
