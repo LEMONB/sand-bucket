@@ -1,6 +1,6 @@
 export const CAMPAIGN_COUNT = 400;
 export const CAMPAIGN_VERSION = 1;
-export const CAMPAIGN_DIFFICULTIES = ['Знакомство', 'Развитие', 'Сочетание', 'Испытание', 'Передышка'];
+export const CAMPAIGN_DIFFICULTIES = ['Очень лёгкий', 'Лёгкий', 'Средний', 'Сложный', 'Очень сложный'];
 export function campaignPhase(number: number): number { return (number - 1) % 5; }
 export function campaignKinds(number: number): number[] {
   const wave = Math.floor((number - 1) / 5), phase = campaignPhase(number);

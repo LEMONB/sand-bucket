@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { BeltView } from '../src/belt-view';
-import { Game, HEIGHT, WIDTH, advanceFrame, type Speed } from '../src/game';
+import { Game, HEIGHT, WIDTH, LOOP_TICKS, advanceFrame, type Speed } from '../src/game';
 
 // Only the DOM operations used by the view; real geometry is checked in the browser.
 class ElementStub {
@@ -126,4 +126,24 @@ it('resizes an active completion without restarting its animation', () => {
   belt.getBoundingClientRect = () => ({ left: 30, right: 255, top: 10, bottom: 61, width: 225, height: 51 } as DOMRect);
   view.measure();view.draw(game, 0, 2);
   expect(complete.style.width).toBe('36px');expect(complete.style.opacity).toBe(opacity);
+});
+
+
+it.each([['won', 1], ['won', 2], ['lost', 1], ['lost', 2]] as const)('keeps the belt moving after %s at speed %i without advancing the game', (status, speed) => {
+  const { belt, view, game } = fixture(speed, false);
+  game.status=status;
+  const before=structuredClone({cells:game.cells,slots:game.slots,collected:game.collected,tick:game.tick,motionTick:game.motionTick});
+  const x=()=>Number(belt.children[0].style.transform.match(/translateX\(([^p]+)/)![1]);
+  const start=x();
+  view.draw(game, .1, speed);
+  expect(x()-start).toBeCloseTo(.1*speed*60/LOOP_TICKS*300);
+  const moving=x();
+  view.measure();view.draw(game, 0, speed);
+  expect(x()).toBe(moving);
+  view.draw(game, LOOP_TICKS/(60*speed), speed);
+  expect(x()).toBeCloseTo(moving);
+  expect({cells:game.cells,slots:game.slots,collected:game.collected,tick:game.tick,motionTick:game.motionTick}).toEqual(before);
+  expect(game.status).toBe(status);
+  view.reset();view.draw(game, 0, speed);
+  expect(x()).toBeCloseTo(start);
 });
