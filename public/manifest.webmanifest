@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Sand Bucket",
   "short_name": "Sand Bucket",
-  "description": "Песок, цвет и правильный момент.",
+  "description": "Собирай песок в вёдра по цветам.",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",

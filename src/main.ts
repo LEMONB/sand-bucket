@@ -25,9 +25,9 @@ const root=document.querySelector<HTMLDivElement>('#app')!;
 
 root.innerHTML=`<section id="menu" class="menu" aria-label="Главное меню">
 <header class="brand"><span class="brand-mark">${bucketIcon}</span><span>SAND BUCKET</span></header>
-<div class="intro"><span class="eyebrow">МАЛЕНЬКАЯ ПАУЗА</span><h1>Всё течёт.<br><span>Песок тоже.</span></h1><p>Новый узор. Знакомое спокойствие.</p></div>
+<div class="intro"><span class="eyebrow">СОБЕРИ ВСЕ ЦВЕТА</span><h1>Каждому цвету<br><span>— своё ведро.</span></h1><p>Выбирай вёдра и собирай песок.</p></div>
 <div class="level-card"><div class="preview-wrap"><canvas id="preview" width="128" height="128" aria-hidden="true"></canvas><span id="menu-number" class="level-badge"></span></div><div class="level-description"><h2 id="menu-title"></h2><span id="menu-difficulty" class="level-state"></span></div></div>
-<label class="level-picker">Выбрать уровень <select id="level-select" aria-label="Выбрать доступный уровень"></select></label><button id="play" class="primary">Играть →</button><p class="menu-note">Без спешки. Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p><footer class="app-version">v${version}<span id="menu-update-note" class="update-note" role="status" hidden>Обновление готово</span></footer></section>
+<label class="level-picker">Выбрать уровень <select id="level-select" aria-label="Выбрать доступный уровень"></select></label><button id="play" class="primary">Играть</button><p class="menu-note">Без рекламы.</p><p id="offline-note" class="offline-note" role="status"></p><footer class="app-version">v${version}<span id="menu-update-note" class="update-note" role="status" hidden>Обновление готово</span></footer></section>
 <svg id="field-walls" aria-hidden="true"><defs><filter id="round-field-walls" filterUnits="userSpaceOnUse" x="-20" y="-20" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="4"/><feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -9"/></filter></defs><rect fill="#eeeee3"/><g fill="#82988b" filter="url(#round-field-walls)"/></svg><section id="game" class="mock-game" hidden aria-label="Игра">
 <header class="mock-header"><button id="restart" class="icon-button" aria-label="Начать уровень заново">↻</button><button id="home" class="icon-button" aria-label="Вернуться в меню">‹</button><span class="level-info"><span id="level-number" class="mock-brand"></span><span id="update-note" class="update-note" role="status" hidden>Обновление готово</span></span><button id="mechanic-help" aria-label="Правила механик"><span id="difficulty"></span> ⓘ</button></header>
 <div class="mock-status"><span id="percent">0%</span><progress id="progress" max="100" value="0" aria-label="Собрано песка"></progress><span id="count">0 / 5</span></div>
@@ -60,7 +60,7 @@ function menu():void {
   const picker=el<HTMLSelectElement>('level-select');
   picker.innerHTML=Array.from({length:progress.unlocked},(_,i)=>`<option value="${i+1}">${i+1}${i+1<progress.data.number?' ✓':''}</option>`).join('');
   picker.value=String(selectedLevel);
-  el('play').textContent=progress.completed||selectedLevel<progress.data.number?'Переиграть →':'Играть →';
+  el('play').textContent='Играть';
   const preview=playableLevel(campaignLevel(selectedLevel));
   paintSand(el<HTMLCanvasElement>('preview').getContext('2d')!,preview.cells,preview.palette);
   storageNote();
@@ -105,7 +105,7 @@ function dialog(title:string,copy:string,action:string,callback:()=>void):void {
 function pause():void {
   if(!visible||paused||game.status!=='playing')return;
   paused=true;accumulator=0;sand.app.ticker.stop();
-  dialog('Небольшая пауза','Песок подождёт.','Продолжить',()=>{paused=false;el('overlay').hidden=true;accumulator=0;sand.app.ticker.start();el('restart').focus();});
+  dialog('Пауза','Продолжай, когда будешь готов.','Продолжить',()=>{paused=false;el('overlay').hidden=true;accumulator=0;sand.app.ticker.start();el('restart').focus();});
 }
 async function start():Promise<void> {
   if(updates?.apply({level:selectedLevel,play:true}))return;
@@ -132,10 +132,10 @@ async function start():Promise<void> {
         }
         if(!finished&&resultReady(game.status,belt.busy,lossElapsed)){
           finished=true;sand.app.ticker.stop();
-          if(game.status==='won'&&puzzleScenario)dialog('До последней песчинки.',PUZZLE_TITLES[puzzleScenario],'Повторить',reset);
+          if(game.status==='won'&&puzzleScenario)dialog('Уровень пройден!',PUZZLE_TITLES[puzzleScenario],'Повторить',reset);
           else if(game.status==='won'&&record.number===CAMPAIGN_COUNT)dialog('Все 400 уровней пройдены!','Можно вернуться к любимым рисункам.','Выбрать уровень',home);
-          else if(game.status==='won')dialog('До последней песчинки.','Следующий узор уже ждёт.','Следующий',()=>{selectedLevel=record.number+1;void start();});
-          else dialog('Цвета разминулись.','Освободи путь к нужным цветам и попробуй другой порядок.','Попробовать снова',reset);
+          else if(game.status==='won')dialog('Уровень пройден!','Можно переходить к следующему уровню.','Следующий',()=>{selectedLevel=record.number+1;void start();});
+          else dialog('Не осталось свободных мест.','Освободи путь к нужным цветам и попробуй другой порядок.','Попробовать снова',reset);
         }
       });
       sand.app.canvas.addEventListener('webglcontextlost',()=>{
@@ -147,7 +147,7 @@ async function start():Promise<void> {
     if(!puzzleScenario&&!lossScenario&&(record.kinds??[]).some(k=>!shownMechanics.has(k)))explainMechanics(true);
   } catch(error){
     console.error(error);el('offline-note').textContent='Не удалось запустить игру. Обнови страницу.';
-  } finally {loading=false;play.disabled=false;play.textContent=progress.completed?'Переиграть →':'Играть →';el<HTMLButtonElement>('result-action').disabled=false;}
+  } finally {loading=false;play.disabled=false;play.textContent='Играть';el<HTMLButtonElement>('result-action').disabled=false;}
 }
 function home():void {
   if(updates?.apply({level:selectedLevel,play:false}))return;
