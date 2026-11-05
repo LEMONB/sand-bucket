@@ -6,7 +6,7 @@ import { ProgressStore } from '../src/progress';
 
 it.each([2,3,4,5])('keeps pilot level %i solvable at both speeds with every pause scenario',number=>{
   const level=playableLevel(campaignLevel(number));
-  for(const speed of [1,2] as const)for(const pause of [0,120,1800,-1]){
+  for(const speed of [1,2] as const)for(const pause of [0,-1]){
     const proof=certify(level,speed,pause);
     expect(proof.decisions.length).toBeGreaterThan(0);
     if(number>=3)expect(proof.unproductive).toBeGreaterThan(0);

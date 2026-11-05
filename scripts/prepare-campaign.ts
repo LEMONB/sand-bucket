@@ -13,6 +13,7 @@ import type { Proof } from './campaign/solver.ts';
 import { structuralSignature } from './campaign/selection.ts';
 import { FAMILIES } from './campaign/layout.ts';
 import { MECHANIC_NAMES } from '../src/mechanic-help.ts';
+import { PLANNING_PILOT } from './campaign/planning-profile.ts';
 import { changedSince, playableKey, readVerified, verificationHash, verificationOptions, writeVerified, validProofs } from './campaign/verification.ts';
 
 import { assertCapacities, capacityRanges, normalizeCapacities } from './campaign/capacities.ts';
@@ -21,13 +22,14 @@ const root=new URL('../',import.meta.url);
 const args=process.argv.slice(2),rebalance=args.includes('--rebalance-capacities'),refreshSwaps=args.includes('--refresh-swaps');
 const source=rebalance||refreshSwaps?JSON.parse(readFileSync(new URL('src/levels/campaign.json',root),'utf8')) as CampaignCatalog:undefined;
 if(source&&(source.version!==CAMPAIGN_VERSION||source.levels.length!==CAMPAIGN_COUNT||source.levels.some((l,i)=>l.number!==i+1||l.art!==i%100)))throw Error('Исходный каталог неполон');
-const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts','scripts/campaign/capacities.ts','scripts/campaign/swap-capacities.ts','scripts/campaign/capacity-policy.ts','scripts/campaign/capacity-targets.json'];
+const files=['src/game.ts','src/mechanics.ts','src/art-catalog.ts','src/campaign-art.ts','src/art-scenes.ts','src/generator.ts','src/level-mechanics.ts','src/campaign-rules.ts','scripts/campaign/layout.ts','scripts/campaign/candidate.ts','scripts/campaign/solver.ts','scripts/campaign/capacities.ts','scripts/campaign/swap-capacities.ts','scripts/campaign/capacity-policy.ts','scripts/campaign/capacity-targets.json','scripts/campaign/planning-profile.ts','scripts/campaign/planning-candidate.ts','scripts/campaign/planning-analysis.ts','scripts/campaign/difficulty-audit.ts','scripts/campaign/planning-anchors.json'];
 const fingerprint=createHash('sha256');for(const file of files)fingerprint.update(file).update(readFileSync(new URL(file,root)));
 const hash=fingerprint.digest('hex');
 const migrationHash=source?createHash('sha256').update(hash).update(JSON.stringify(source)).update(String(refreshSwaps)).update(readFileSync(new URL('scripts/prepare-campaign.ts',root))).update(readFileSync(new URL('scripts/campaign-worker.ts',root))).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).update(readFileSync(new URL('scripts/campaign/verification.ts',root))).digest('hex'):undefined;
 const directory=new URL(migrationHash?`.cache/capacities/${migrationHash}/`:`.cache/campaign/${hash}/`,root);
 const catalogFingerprint=createHash('sha256').update(hash).update(readFileSync(new URL('scripts/campaign/selection.ts',root))).digest('hex');
 mkdirSync(directory,{recursive:true});
+const candidateLimit=rebalance||refreshSwaps?24:144;
 const pilot=args.includes('--pilot'),mergedColors=args.includes('--verify-playable'),verify=args.includes('--verify')||mergedColors;
 const options=verificationOptions(args.filter(arg=>arg!=='--refresh-swaps'),CAMPAIGN_COUNT);
 if(args.filter(arg=>['--pilot','--verify','--verify-playable','--all','--rebalance-capacities','--refresh-swaps'].includes(arg)).length!==1)throw Error('Выберите один режим проверки или генерации');
@@ -39,7 +41,7 @@ if(mergedColors||!verify){mkdirSync(proofDirectory,{recursive:true});mkdirSync(c
 const workerArg=args.find(arg=>arg.startsWith('--workers='));
 const workers=workerArg?Number(workerArg.split('=')[1]):Math.min(4,Math.max(1,availableParallelism()-1));
 if(!Number.isInteger(workers)||workers<1||workers>8)throw Error('Число workers должно быть от 1 до 8');
-let numbers=pilot?[1,6,11,16,21,26,31,36,41,46,103,104,154,203,204,254,304,354,399,400]:Array.from({length:CAMPAIGN_COUNT},(_,i)=>i+1);
+let numbers=pilot?PLANNING_PILOT:Array.from({length:CAMPAIGN_COUNT},(_,i)=>i+1);
 const started=performance.now(),accepted=new Map<number,CandidateResult>(),failures:unknown[]=[],signatures=new Set<string>();
 let jobs=0,cached=0,processed=0,verified=0,certificateHits=0;
 const originalSignatures=new Map(source?.levels.map(l=>[structuralSignature({...l,...playableLevel(l)}),l.number]));
@@ -61,7 +63,7 @@ async function work<T>(message:unknown):Promise<T>{
     });
     const candidate=result as Partial<CandidateResult>;
     // Search clones deoptimize Game's hot methods in V8; do not carry that cost to the next job.
-    if(candidate.error||candidate.proofs?.some(proof=>proof.nodes>0)){
+    if(candidate.error||candidate.rating||candidate.proofs?.some(proof=>proof.nodes>0)){
       const index=pool.indexOf(worker);await worker.terminate();worker=startWorker();pool[index]=worker;
     }
     return result;
@@ -130,7 +132,7 @@ try{
       const certified=mergedColors&&!options.force?readVerified(certificate,key):undefined;
       if(certified){certificateHits++;accepted.set(level.number,{level,proofs:certified,generationMs:0,certificationMs:0});return;}
       let record:CandidateResult|undefined;
-      for(let attempt=0;!mergedColors&&attempt<24;attempt++){
+      for(let attempt=0;!mergedColors&&attempt<candidateLimit;attempt++){
         const file=new URL(`${level.number}-${attempt}.json`,directory);
         if(existsSync(file)){const candidate=JSON.parse(readFileSync(file,'utf8')) as CandidateResult;if(candidate.level&&JSON.stringify(candidate.level)===JSON.stringify(level)){record=candidate;break;}}
       }
@@ -142,11 +144,11 @@ try{
           if(!existsSync(file))continue;
           try{
             const saved=JSON.parse(readFileSync(file,'utf8'));
-            if(JSON.stringify(saved.level)===JSON.stringify(level)&&saved.proofs?.length===8&&new Set(saved.proofs.map((p:Proof)=>`${p.speed}:${p.pause}`)).size===8&&saved.proofs.every((p:Proof)=>[1,2].includes(p.speed)&&[0,120,1800,-1].includes(p.pause)&&Array.isArray(p.decisions))){record.proofs=saved.proofs;break;}
+            if(JSON.stringify(saved.level)===JSON.stringify(level)&&validProofs(saved.proofs)){record.proofs=saved.proofs;break;}
           }catch{/* Ignore interrupted proof files; certify this level again. */}
         }
       }
-      if(!record||(!mergedColors&&(!record.proofs||record.proofs.length!==8||new Set(record.proofs.map(p=>`${p.speed}:${p.pause}`)).size!==8||record.proofs.some(p=>![1,2].includes(p.speed)||![0,120,1800,-1].includes(p.pause)))))throw Error(`Нет доказательств для ${level.number}`);
+      if(!record||(!mergedColors&&!validProofs(record.proofs)))throw Error(`Нет доказательств для ${level.number}`);
       const playable=playableLevel(level);
       new Game(playable);
       record.signature=structuralSignature({...level,...playable});
@@ -173,18 +175,18 @@ try{
     // Keep workers occupied; accept results in level order for deterministic deduplication.
     const pending=numbers.map(async number=>{
       const retain=rebalance||(refreshSwaps&&!source!.levels[number-1].field.some(b=>b?.swapWith!==undefined));
-      for(let attempt=retain?-1:0;attempt<24;attempt++){
+      for(let attempt=retain?-1:0;attempt<candidateLimit;attempt++){
         const result=await run(number,attempt);
         if(result.level&&!duplicate(result))return {number,attempt,result};
         failures.push({number,attempt,error:result.error??'Повтор планировки'});
         if(refreshSwaps&&retain)break;
       }
-      return {number,attempt:24,result:undefined};
+      return {number,attempt:candidateLimit,result:undefined};
     });
     for(const task of pending){
       const item=await task;
         let result=item.result;
-        for(let attempt=item.attempt+1;result&&duplicate(result)&&attempt<24;attempt++){
+        for(let attempt=item.attempt+1;result&&duplicate(result)&&attempt<candidateLimit;attempt++){
           const next=await run(item.number,attempt);if(next.level)result=next;
         }
         if(!result?.level||duplicate(result)){failures.push({number:item.number,error:'Позиция не заполнена'});continue;}

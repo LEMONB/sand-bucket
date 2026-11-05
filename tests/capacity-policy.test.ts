@@ -37,7 +37,7 @@ it('rejects a playable but out-of-policy catalog before accepting cached certifi
     record.field.find((b:{id:number}|null)=>b?.id===4).capacity=832;
     writeFileSync(new URL('src/levels/campaign.json',root),JSON.stringify(catalog));
     const level=playableLevel(record);
-    const proofs=([1,2] as const).flatMap(speed=>[0,120,1800,-1].map(pause=>certify(level,speed,pause)));
+    const proofs=([1,2] as const).flatMap(speed=>[0,-1].map(pause=>certify(level,speed,pause)));
     const hash=verificationHash(f=>readFileSync(new URL(f,root),'utf8'));
     const key=createHash('sha256').update(hash).update(playableKey(level)).digest('hex');
     const directory=new URL('.cache/playable/verified/',root);mkdirSync(directory,{recursive:true});

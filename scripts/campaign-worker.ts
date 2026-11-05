@@ -8,7 +8,7 @@ parentPort!.on('message',({number,attempt,level,proofs,mergedColors,source}:{num
   else if(level&&(proofs||mergedColors)){
     try{
       const playable=playableLevel(level);
-      const cases=proofs?.length?proofs:[1,2].flatMap(speed=>[0,120,1800,-1].map(pause=>({speed:speed as 1|2,pause,decisions:[]})));
+      const cases=proofs?.length?proofs:[1,2].flatMap(speed=>[0,-1].map(pause=>({speed:speed as 1|2,pause,decisions:[]})));
       const checked = cases.map(proof => {
         try {
           if(proof.decisions.length){

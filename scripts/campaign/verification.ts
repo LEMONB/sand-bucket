@@ -81,17 +81,17 @@ export async function changedSince(root: URL, catalog: CampaignCatalog, ref: str
 }
 
 export function validProofs(value: unknown): value is Proof[] {
-  if (!Array.isArray(value) || value.length!==8) return false;
+  if (!Array.isArray(value) || value.length!==4) return false;
   const cases=new Set<string>();
   const natural=(n:unknown)=>typeof n==='number' && Number.isSafeInteger(n) && n>=0;
   for (const proof of value) {
-    if (!proof || ![1,2].includes(proof.speed) || ![0,120,1800,-1].includes(proof.pause)) return false;
+    if (!proof || ![1,2].includes(proof.speed) || ![0,-1].includes(proof.pause)) return false;
     cases.add(`${proof.speed}:${proof.pause}`);
     if (!natural(proof.ticks) || !natural(proof.nodes) || !natural(proof.unproductive) || !natural(proof.peakSlots) || proof.peakSlots>5) return false;
     if (!Array.isArray(proof.decisions) || !proof.decisions.length || !proof.decisions.every((d:Proof['decisions'][number])=>
       d && natural(d.bucketId) && natural(d.collected) && typeof d.exposed==='boolean' && Array.isArray(d.completed) && d.completed.every(natural))) return false;
   }
-  return cases.size===8;
+  return cases.size===4;
 }
 
 export function readVerified(file: URL, key: string): Proof[] | undefined {

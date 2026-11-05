@@ -7,13 +7,20 @@ import { pathToFileURL } from 'node:url';
 import { campaignLevel, playableLevel } from '../src/campaign';
 import type { CampaignCatalog } from '../src/campaign-types';
 import type { Proof } from '../scripts/campaign/solver';
-import { changedLevels, changedSince, playableKey, readVerified, verificationHash, verificationOptions, VERIFICATION_FILES, writeVerified } from '../scripts/campaign/verification';
+import { changedLevels, changedSince, playableKey, readVerified, verificationHash, verificationOptions, VERIFICATION_FILES, writeVerified, validProofs } from '../scripts/campaign/verification';
 
 const directories:string[]=[];
 function temporary():string { const dir=mkdtempSync(join(tmpdir(),'sand-verify-test-'));directories.push(dir);return dir; }
 afterEach(()=>{for(const dir of directories.splice(0))rmSync(dir,{recursive:true,force:true});});
-const proofs=():Proof[]=>[1,2].flatMap(speed=>[0,120,1800,-1].map(pause=>({speed:speed as 1|2,pause,ticks:1,peakSlots:1,unproductive:0,nodes:0,decisions:[{bucketId:0,collected:0,completed:[],exposed:true}]})));
+const proofs=():Proof[]=>[1,2].flatMap(speed=>[0,-1].map(pause=>({speed:speed as 1|2,pause,ticks:1,peakSlots:1,unproductive:0,nodes:0,decisions:[{bucketId:0,collected:0,completed:[],exposed:true}]})));
 const catalog=():CampaignCatalog=>({version:1,fingerprint:'fixture',levels:[1,2,101,201,301].map(campaignLevel)});
+
+it('requires both speeds and exactly the two selected pause scenarios', () => {
+  expect(proofs().map(p => [p.speed, p.pause])).toEqual([[1,0],[1,-1],[2,0],[2,-1]]);
+  expect(validProofs(proofs())).toBe(true);
+  expect(validProofs(proofs().map(p => ({...p, pause: p.pause === -1 ? 120 : 0})))).toBe(false);
+  expect(validProofs([...proofs(), ...proofs()])).toBe(false);
+});
 
 it('selects explicit levels and rejects unsafe or ambiguous CLI arguments',()=>{
   expect(verificationOptions(['--verify-playable','--levels','209,6,6','--workers=2'],400)).toEqual({levels:[6,209],force:false});

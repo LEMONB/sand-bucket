@@ -3,6 +3,9 @@ import { campaignLevel,playableLevel } from '../src/campaign';
 import { Game } from '../src/game';
 import { assertCapacities } from '../scripts/campaign/capacities';
 import { structuralSignature } from '../scripts/campaign/selection';
+import { MECHANIC_UNLOCKS } from '../scripts/campaign/planning-profile';
+import anchors from '../scripts/campaign/planning-anchors.json';
+import selected from '../scripts/campaign/planning-selection.json';
 import { campaignColumns, campaignRows } from '../src/campaign-rules';
 import { campaignCapacityColors } from '../scripts/campaign/capacity-policy';
 
@@ -14,8 +17,18 @@ it('contains 400 valid, distinct puzzles using each artwork four times',()=>{
    expect(record.number).toBe(number);expect(record.art).toBe((number-1)%100);
    expect(record.family).toBe(Math.floor((number-1)/100));
    const level=playableLevel(record);
-   expect(level.columns).toBe(campaignColumns(number));
-   expect(level.field.length).toBe(campaignColumns(number)*campaignRows(number));
+   expect(record.difficulty).toBe((number - 1) % 5);
+   if (number <= 5) {
+     expect(record).toEqual(anchors[number - 1]);
+   } else if (selected.includes(number)) {
+     const allowed = record.difficulty === 0 ? [6,7] : record.difficulty < 3 ? [6,7,8] : [8,9];
+     expect(allowed).toContain(record.columns);
+     expect(level.field.length).toBe(record.columns * (record.columns - 3));
+     for (const kind of record.kinds) expect(number).toBeGreaterThanOrEqual(MECHANIC_UNLOCKS.find(([id]) => id === kind)![1]);
+   } else {
+     expect(record.columns).toBe(campaignColumns(number));
+     expect(record.field.length).toBe(campaignColumns(number) * campaignRows(number));
+   }
    // Freeze the pre-rebalance selection: measuring the repaired catalog would hide regressions.
    assertCapacities(level,campaignCapacityColors(number));
    expect(new Game(level).paths.size).toBeGreaterThan(0);

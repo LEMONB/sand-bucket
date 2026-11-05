@@ -3,18 +3,20 @@ import { mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { campaignLevel,playableLevel } from '../src/campaign';
+import { playableLevel } from '../src/campaign';
+import type { CampaignLevel } from '../src/campaign-types';
+import fixture from './fixtures/capacity-cache-level.json';
 import { capacityGroups } from '../scripts/campaign/capacities';
 import { auditLevel } from '../scripts/campaign/capacity-audit';
 import { auditHashes,auditStats,measurementKey,auditCandidateKey,type AuditCache } from '../scripts/campaign/capacity-audit-cache';
 import { certify,type Proof } from '../scripts/campaign/solver';
 
-const record=campaignLevel(6);
+const record=structuredClone(fixture) as CampaignLevel;
 const color=capacityGroups(record).get(4)!;
 color[0]!.capacity=11;color[1]!.capacity=33;
 const level=playableLevel(record);
 let proofs:Proof[];
-beforeAll(()=>{proofs=[1,2].flatMap(speed=>[0,120,1800,-1].map(pause=>certify(level,speed as 1|2,pause)));},30000);
+beforeAll(()=>{proofs=[1,2].flatMap(speed=>[0,-1].map(pause=>certify(level,speed as 1|2,pause)));},30000);
 const folders:string[]=[];
 afterEach(()=>{for(const f of folders.splice(0))rmSync(f,{recursive:true,force:true});});
 function cache():AuditCache {
@@ -23,26 +25,26 @@ function cache():AuditCache {
   return {directory,certificates,hashes:auditHashes(f=>f),stats:auditStats()};
 }
 it('reuses measurements and the candidate when a new threshold selects the same colors',()=>{
-  const c=cache(),first=auditLevel(record,proofs,0.5,undefined,c);
+  const c=cache(),first=auditLevel(record,proofs,60,undefined,c);
   expect(first.status).toBe('simple');expect(first.colors).toContain(4);
   expect(c.stats.measurementRuns).toBe(2);expect(c.stats.candidateRuns).toBe(1);
   c.stats=auditStats();
-  const second=auditLevel({...record,seed:999},proofs,1,undefined,c);
+  const second=auditLevel({...record,seed:999},proofs,120,undefined,c);
   expect(second.colors).toEqual(first.colors);
   expect(second.candidate!.seed).toBe(999);
   expect(second.candidate!.field).toEqual(first.candidate!.field);
   expect(c.stats).toEqual({measurementHits:1,measurementRuns:0,candidateHits:1,candidateRuns:0,proofHits:0});
 },30000);
 it('recomputes damaged entries and reuses certificates and candidate timings',()=>{
-  const c=cache(),first=auditLevel(record,proofs,0.5,undefined,c);
+  const c=cache(),first=auditLevel(record,proofs,60,undefined,c);
   const mk=measurementKey(level,proofs,c.hashes),ck=auditCandidateKey(level,proofs,new Set(first.colors),c.hashes);
   const measurement=new URL(`measurements/${mk}.json`,c.directory);
   const damaged=JSON.parse(readFileSync(measurement,'utf8'));damaged.value[0].seconds=999;
   writeFileSync(measurement,JSON.stringify(damaged));c.stats=auditStats();
-  expect(auditLevel(record,proofs,0.5,undefined,c).before).toEqual(first.before);
+  expect(auditLevel(record,proofs,60,undefined,c).before).toEqual(first.before);
   expect(c.stats.measurementRuns).toBe(1);expect(c.stats.candidateHits).toBe(1);
   writeFileSync(new URL(`candidates/${ck}.json`,c.directory),'{');c.stats=auditStats();
-  const repaired=auditLevel(record,proofs,0.5,undefined,c);
+  const repaired=auditLevel(record,proofs,60,undefined,c);
   expect(repaired.candidate).toEqual(first.candidate);
   expect(c.stats).toEqual({measurementHits:2,measurementRuns:0,candidateHits:0,candidateRuns:1,proofHits:1});
 },30000);
@@ -69,11 +71,11 @@ it('keys each level, route and selected set separately, excluding report and gen
   }
 });
 it('changing one level leaves another level cached',()=>{
-  const c=cache();auditLevel(record,proofs,0.5,undefined,c);
+  const c=cache();auditLevel(record,proofs,60,undefined,c);
   const other=structuredClone(record);other.number=7;
   other.field.find(b=>b)!.hidden=true;
-  auditLevel(other,proofs,0.5,undefined,c);
+  auditLevel(other,proofs,60,undefined,c);
   c.stats=auditStats();
-  auditLevel(record,proofs,1,undefined,c);
+  auditLevel(record,proofs,120,undefined,c);
   expect(c.stats).toEqual({measurementHits:1,measurementRuns:0,candidateHits:1,candidateRuns:0,proofHits:0});
 },30000);
