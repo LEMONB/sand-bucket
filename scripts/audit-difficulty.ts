@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { CampaignCatalog } from '../src/campaign-types.ts';
 import { playableLevel } from '../src/campaign-art.ts';
-import { CAMPAIGN_DIFFICULTIES, campaignPhase } from '../src/campaign-rules.ts';
+import { CAMPAIGN_DIFFICULTIES } from '../src/campaign-labels.ts';
 import { MECHANIC_NAMES } from '../src/mechanic-help.ts';
 import { CALIBRATION_LEVELS, POLICY_NAMES, probePolicy } from './campaign/difficulty-audit.ts';
 import { replayDecisions } from './campaign/solver.ts';
@@ -25,7 +25,7 @@ for(const number of CALIBRATION_LEVELS){
   const replayed=proofs.map(proof=>replayDecisions(level,proof.decisions,proof.speed,proof.pause));
   const policies=([1,2] as const).flatMap(speed=>POLICY_NAMES.map((_,policy)=>probePolicy(level,speed,policy)));
   assert.equal(playableKey(level),inputKey,'Аудит изменил игровой уровень');
-  results.push({number,current:CAMPAIGN_DIFFICULTIES[campaignPhase(number)],inputKey,
+  results.push({number,current:CAMPAIGN_DIFFICULTIES[record.difficulty],inputKey,
     mechanics:record.kinds.map(k=>MECHANIC_NAMES[k]),record,palette:level.palette,cells:[...level.cells],
     proofs:replayed,policies});
   console.log(JSON.stringify({number,current:results.at(-1)!.current,mechanics:results.at(-1)!.mechanics,

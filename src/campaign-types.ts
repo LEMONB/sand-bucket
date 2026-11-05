@@ -2,6 +2,7 @@ import type { BucketSpec } from './game';
 import type { Mechanics } from './mechanics';
 export interface CampaignLevel {
   number:number;
+  difficulty:0|1|2|3|4;
   art:number;
   seed:number;
   columns:number;

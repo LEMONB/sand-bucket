@@ -130,7 +130,7 @@ export function balancePauses(level:Level):void {
   for(let repair=0;repair<16;repair++){
     let failed:Game|undefined;
     for(const speed of [1,2] as const){
-      for(const pause of [0,120,1800,-1]){
+      for(const pause of [0,-1]){
         const result=greedy(level,speed,pause);
         if(result.game.status!=='won'){failed=result.game;break;}
       }

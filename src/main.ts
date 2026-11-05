@@ -9,7 +9,8 @@ import { MECHANIC_HINTS } from './mechanic-help';
 import { bucketIcon } from './bucket-icon';
 import { Game, advanceFrame, type Speed } from './game';
 import { campaignLevel, playableLevel } from './campaign';
-import { CAMPAIGN_COUNT, CAMPAIGN_DIFFICULTIES, campaignPhase } from './campaign-rules';
+import { CAMPAIGN_COUNT } from './campaign-rules';
+import { CAMPAIGN_DIFFICULTIES } from './campaign-labels';
 import type { CampaignLevel } from './campaign-types';
 import { GameRenderer, paintSand } from './renderer';
 import { BeltView } from './belt-view';
@@ -56,7 +57,7 @@ function storageNote():void {if(!progress.available)el('offline-note').textConte
 function menu():void {
   el('menu-number').textContent=String(selectedLevel);
   el('menu-title').textContent=progress.completed?'Кампания пройдена':`Уровень ${selectedLevel} из ${CAMPAIGN_COUNT}`;
-  el('menu-difficulty').textContent=CAMPAIGN_DIFFICULTIES[campaignPhase(selectedLevel)];
+  el('menu-difficulty').textContent=CAMPAIGN_DIFFICULTIES[campaignLevel(selectedLevel).difficulty];
   const picker=el<HTMLSelectElement>('level-select');
   picker.innerHTML=Array.from({length:progress.unlocked},(_,i)=>`<option value="${i+1}">${i+1}${i+1<progress.data.number?' ✓':''}</option>`).join('');
   picker.value=String(selectedLevel);
@@ -94,7 +95,7 @@ function reset():void {
   if(updates?.apply({level:record.number,play:true}))return;
   game=new Game(puzzleScenario?createPuzzleScenario(puzzleScenario):lossScenario?createLossScenario():playableLevel(record));accumulator=0;lossElapsed=0;paused=false;finished=false;wonSaved=false;lastPercent=-1;lastCount=-1;
   root.style.setProperty('--columns',String(game.columns));root.style.setProperty('--rows',String(game.rows));el('overlay').hidden=true;
-  el('level-number').textContent=puzzleScenario?PUZZLE_TITLES[puzzleScenario]:`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=puzzleScenario?'Образец':lossScenario?'Проверка проигрыша':CAMPAIGN_DIFFICULTIES[campaignPhase(record.number)];
+  el('level-number').textContent=puzzleScenario?PUZZLE_TITLES[puzzleScenario]:`УРОВЕНЬ ${record.number}`;el('difficulty').textContent=puzzleScenario?'Образец':lossScenario?'Проверка проигрыша':CAMPAIGN_DIFFICULTIES[record.difficulty];
   el<HTMLButtonElement>('restart').disabled=false;el('hint').textContent='';belt.reset();sand.reset();layoutGame(root,game);buildField();belt.measure();if(lossScenario){for(let id=0;id<5;id++)game.launch(id);updateField();}sand.draw(game);belt.draw(game,0,speed);hud();sand.app.ticker.start();
 }
 function dialog(title:string,copy:string,action:string,callback:()=>void):void {
